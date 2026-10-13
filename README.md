@@ -2,7 +2,7 @@
 
 A Markdown-powered security notebook with a custom, GitBook-style frontend. Closely matches the [provided reference](https://kabinet.gitbook.io/ctf-writeup/2026/wiz-cloud-security-challenge/happy-birthday): dark clean theme, Inter typography, IBM Plex Mono code, blue-tinted filled sidebar, pill navigation, and a three-column reading layout.
 
-**Site:** https://evilzcoder.github.io/kokogray-lab/ (requires a successful Pages deployment)
+**Site:** https://evilzcoder.github.io/kokogray-lab/
 
 This is an independent static website, not the hosted GitBook product. It uses the Kokogray Lab identity and original starter documentation, not the reference author's logo or articles.
 
@@ -82,7 +82,7 @@ python -m playwright install chromium
 python scripts/browser_checks.py
 ```
 
-The browser script can also use an installed Chrome or Edge. It serves the built site under `/kokogray-lab/`, checks desktop/mobile behavior, and saves screenshots to ignored `test-results/`.
+The browser script can also use an installed Chrome or Edge. It serves the built site under `/kokogray-lab/`, checks desktop/mobile behavior, and saves screenshots to ignored `test-results/`. It also checks measured reference colors, component styles, and article geometry at seven widths against `tests/reference_theme.json`; unit tests lock the matching font binaries by SHA-256. The dark/light desktop and mobile screenshots support visual review rather than claiming pixel equivalence between different articles.
 
 ## Deploy to GitHub Pages
 
@@ -109,4 +109,4 @@ tests/                 Generated-site validation
 
 The theme reproduces observed styling rather than embedding GitBook's proprietary runtime. Its colors, typography, default dark appearance, and layout were derived from the public reference. GitBook-hosted services such as AI chat and account management are not included. Search, copy, navigation, and theme switching run entirely in the static frontend.
 
-Fonts retain their SIL Open Font License notices under `theme/assets/fonts/`. The theme uses an original Kokogray monogram and inline SVG controls.
+Fonts retain their SIL Open Font License notices under `theme/assets/fonts/`. The theme uses an original Kokogray monogram. Inline controls use locally bundled Font Awesome Free 7.0.0 SVG icons under CC BY 4.0, with attribution retained in the rendered SVGs and `theme/assets/font-awesome-LICENSE.txt`. These open-source replacements are not claimed to be the reference's exact icon paths.

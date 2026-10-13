@@ -49,6 +49,76 @@ def assert_no_horizontal_overflow(page):
     ), f"Page overflows horizontally: {page.url}"
 
 
+def assert_reference_styles(page, expected):
+    for selector, properties in expected.items():
+        actual = page.locator(selector).first.evaluate(
+            "(element, keys) => { const style = getComputedStyle(element); "
+            "return Object.fromEntries(keys.map(key => [key, style[key]])); }",
+            list(properties),
+        )
+        for key, value in properties.items():
+            assert actual[key] == value, f"{selector} {key}: {actual[key]!r}, expected {value!r}"
+
+
+def assert_reference_box(page, selector, expected):
+    actual = page.locator(selector).first.bounding_box()
+    assert actual is not None, f"Missing visible reference component: {selector}"
+    for key, value in expected.items():
+        assert abs(actual[key] - value) <= 0.1, f"{selector} {key}: {actual[key]}, expected {value}"
+
+
+def check_reference_theme(page, base, checks):
+    reference = json.loads((ROOT / "tests/reference_theme.json").read_text(encoding="utf-8"))
+    article = base + "2026/lab-notebook/writeup-template/"
+    page.set_viewport_size({"width": 1440, "height": 1000})
+    page.emulate_media(reduced_motion="reduce")
+    page.goto(article, wait_until="networkidle")
+    page.evaluate("document.fonts.ready")
+    page.evaluate("""() => {
+      const sample = document.createElement('p');
+      sample.className = 'reference-type-sample';
+      sample.innerHTML = '<strong>Typography sample</strong> <a href="#main-content">Link sample</a>';
+      document.querySelector('.page-content').append(sample);
+    }""")
+    page.mouse.move(0, 0)
+    assert_reference_styles(page, reference["desktop_styles"])
+    for selector, dimensions in reference["desktop_boxes"].items():
+        assert_reference_box(page, selector, dimensions)
+    expect(page.locator(".breadcrumbs li")).to_have_text(["2026", "Lab notebook"])
+    expect(page.locator(".search-shortcut kbd")).to_have_count(2)
+    expect(page.locator(".nav-link .icon")).to_have_count(0)
+    for theme, styles in reference["palettes"].items():
+        page.locator(f".outline-footer [data-set-theme='{theme}']").click()
+        page.mouse.move(0, 0)
+        page.evaluate("window.scrollTo(0, 0)")
+        assert_reference_styles(page, styles)
+        page.screenshot(path=str(RESULTS / f"reference-desktop-{theme}.png"))
+    checks.append("Measured reference desktop geometry, component typography, and both color palettes")
+
+    for dimensions in reference["responsive"]:
+        width = dimensions["viewport"]
+        page.set_viewport_size({"width": width, "height": 1000})
+        page.goto(article, wait_until="networkidle")
+        page.evaluate("document.fonts.ready")
+        assert_reference_box(page, ".page-main", {"x": dimensions["x"], "width": dimensions["width"]})
+        assert_reference_styles(page, {
+            ".page-title": {"fontSize": dimensions["title"]},
+            ".page-content h2": {"fontSize": dimensions["section"]},
+            ".page-content h3": {"fontSize": dimensions["subsection"]},
+        })
+        expect(page.locator("[data-set-theme]:visible")).to_have_count(3)
+        assert_no_horizontal_overflow(page)
+        if width == 390:
+            assert_reference_box(page, ".mobile-outline > summary", {
+                "x": 346.5, "y": 90, "width": 27.5, "height": 27.5,
+            })
+            for theme in ("light", "dark"):
+                page.locator(f".mobile-page-theme [data-set-theme='{theme}']").click()
+                page.evaluate("window.scrollTo(0, 0)")
+                page.screenshot(path=str(RESULTS / f"reference-mobile-{theme}.png"))
+    checks.append("Reference article widths and container-responsive headings from 320 to 1920 pixels")
+
+
 def main():
     assert (SITE / "index.html").exists(), "Run mkdocs build --strict first"
     RESULTS.mkdir(exist_ok=True)
@@ -147,7 +217,7 @@ def main():
             expect(page.locator(".site-sidebar [data-close-nav]")).to_be_focused()
             page.screenshot(path=str(RESULTS / "mobile-navigation.png"), full_page=True)
             page.keyboard.press("Shift+Tab")
-            expect(page.get_by_role("button", name="System theme", exact=True)).to_be_focused()
+            expect(page.locator(".drawer-theme").get_by_role("button", name="Dark theme", exact=True)).to_be_focused()
             page.keyboard.press("Tab")
             expect(page.locator(".site-sidebar [data-close-nav]")).to_be_focused()
             page.keyboard.press("Escape")
@@ -167,6 +237,19 @@ def main():
             assert page.url.endswith("#initial-analysis")
             page.screenshot(path=str(RESULTS / "mobile-article.png"), full_page=True)
             checks.append("Mobile nested navigation and inline page outline")
+
+            outline = page.locator(".mobile-outline")
+            outline.locator("summary").click()
+            page.keyboard.press("Tab")
+            page.keyboard.press("Escape")
+            expect(outline).not_to_have_attribute("open", "")
+            expect(outline.locator("summary")).to_be_focused()
+            outline.locator("summary").click()
+            page.mouse.click(2, 80)
+            expect(outline).not_to_have_attribute("open", "")
+            checks.append("Compact mobile outline keyboard and outside-click dismissal")
+
+            check_reference_theme(page, base, checks)
 
             page.goto(base + "404.html", wait_until="networkidle")
             expect(page.locator(".page-title")).to_have_text("Page not found")

@@ -138,7 +138,7 @@
     button.className = "code-copy";
     button.setAttribute("aria-label", "Copy code");
     button.title = "Copy code";
-    button.append($("[data-copy-page] .icon").cloneNode(true));
+    button.textContent = "Copy";
     button.addEventListener("click", () => copy($("code", block).textContent.replace(/\n$/, ""), "Code copied"));
     block.append(button);
   });
@@ -169,9 +169,31 @@
     }, { passive: true });
     window.addEventListener("resize", updateOutline);
   }
-  $$(".mobile-outline a").forEach(link => link.addEventListener("click", () => {
-    $(".mobile-outline").open = false;
-  }));
+  const mobileOutline = $(".mobile-outline");
+  if (mobileOutline) {
+    const summary = $("summary", mobileOutline);
+    $$("a", mobileOutline).forEach(link => link.addEventListener("click", () => {
+      mobileOutline.open = false;
+      const heading = document.getElementById(decodeURIComponent(link.hash.slice(1)));
+      if (heading) {
+        heading.setAttribute("tabindex", "-1");
+        heading.focus({ preventScroll: true });
+      }
+    }));
+    mobileOutline.addEventListener("keydown", event => {
+      if (event.key === "Escape" && mobileOutline.open) {
+        event.preventDefault();
+        mobileOutline.open = false;
+        summary.focus({ preventScroll: true });
+      }
+    });
+    document.addEventListener("click", event => {
+      if (!mobileOutline.contains(event.target)) mobileOutline.open = false;
+    });
+    mobileOutline.addEventListener("focusout", event => {
+      if (!mobileOutline.contains(event.relatedTarget)) mobileOutline.open = false;
+    });
+  }
 
   const dialog = $("#search-dialog");
   const input = $("#site-search");

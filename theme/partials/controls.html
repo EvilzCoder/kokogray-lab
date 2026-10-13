@@ -1,0 +1,8 @@
+{% from 'partials/icons.html' import icon %}
+{% macro theme_picker() -%}
+<div class="theme-picker" role="group" aria-label="Color theme">
+  <button type="button" class="icon-button" data-set-theme="light" aria-label="Light theme" aria-pressed="false" title="Light theme">{{ icon('sun') }}</button>
+  <button type="button" class="icon-button" data-set-theme="system" aria-label="System theme" aria-pressed="false" title="System theme">{{ icon('monitor') }}</button>
+  <button type="button" class="icon-button" data-set-theme="dark" aria-label="Dark theme" aria-pressed="true" title="Dark theme">{{ icon('moon') }}</button>
+</div>
+{%- endmacro %}

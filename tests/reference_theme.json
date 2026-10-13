@@ -1,0 +1,88 @@
+{
+  "source": "https://kabinet.gitbook.io/ctf-writeup/2026/wiz-cloud-security-challenge/happy-birthday",
+  "notes": [
+    "Recorded from the rendered reference, not a pixel comparison of different articles.",
+    "The reference article uses H3/H4 section tiers. Our semantic H2/H3 preserve that visible 24/20px desktop typography.",
+    "Fonts are byte-identical to the reference's Latin Inter and IBM Plex Mono files.",
+    "Original branding, article contents, callouts, search behavior, and open-source replacement icons are not claimed to be pixel-identical."
+  ],
+  "font_sha256": {
+    "inter-latin.woff2": "c940764593d0fe5d596be327ca7558855e018039fb78509aa21921fd3644c3e4",
+    "ibm-plex-mono-latin.woff2": "c36f509c0a8f9f85f29cb44bc8701d8a9e0b14c499e77a884f789ead7093a7ac"
+  },
+  "palettes": {
+    "dark": {
+      "body": {"backgroundColor": "rgb(29, 29, 29)", "color": "rgb(251, 255, 255)"},
+      ".site-header": {"backgroundColor": "rgba(29, 29, 29, 0.88)"},
+      ".sidebar-panel": {"backgroundColor": "rgb(33, 35, 37)"},
+      ".nav-link:not(.is-active)": {"color": "rgba(251, 255, 255, 0.64)"},
+      ".nav-link.is-active": {"color": "rgb(52, 109, 219)", "backgroundColor": "rgb(39, 44, 53)"},
+      ".page-content a:not(.headerlink)": {"color": "rgb(52, 109, 219)"},
+      ".page-outline": {"color": "rgb(177, 193, 221)"},
+      ".search-trigger": {"backgroundColor": "rgb(29, 29, 29)", "borderTopColor": "rgb(58, 68, 85)"},
+      ".page-content p code": {"backgroundColor": "rgb(41, 44, 49)"},
+      ".codehilite": {"backgroundColor": "rgb(33, 35, 37)", "borderTopColor": "rgb(50, 58, 72)"},
+      ".page-content th": {"backgroundColor": "rgb(41, 44, 49)", "borderTopColor": "rgb(50, 58, 72)"},
+      ".page-content td": {"color": "rgb(251, 255, 255)"}
+    },
+    "light": {
+      "body": {"backgroundColor": "rgb(255, 255, 255)", "color": "rgb(26, 29, 34)"},
+      ".site-header": {"backgroundColor": "rgba(255, 255, 255, 0.88)"},
+      ".sidebar-panel": {"backgroundColor": "rgb(248, 250, 254)"},
+      ".nav-link:not(.is-active)": {"color": "rgba(26, 29, 34, 0.64)"},
+      ".nav-link.is-active": {"color": "rgb(52, 109, 219)", "backgroundColor": "rgb(241, 248, 255)"},
+      ".page-content a:not(.headerlink)": {"color": "rgb(52, 109, 219)"},
+      ".page-outline": {"color": "rgb(97, 111, 136)"},
+      ".search-trigger": {"backgroundColor": "rgb(255, 255, 255)", "borderTopColor": "rgb(205, 218, 239)"},
+      ".page-content p code": {"backgroundColor": "rgb(243, 248, 255)"},
+      ".codehilite": {"backgroundColor": "rgb(248, 250, 254)", "borderTopColor": "rgb(220, 230, 248)"},
+      ".page-content th": {"backgroundColor": "rgb(243, 248, 255)", "borderTopColor": "rgb(220, 230, 248)"},
+      ".page-content td": {"color": "rgb(26, 29, 34)"}
+    }
+  },
+  "desktop_styles": {
+    "body": {"fontSize": "16px", "lineHeight": "26px", "fontWeight": "400"},
+    ".site-header .site-brand": {"fontSize": "18px", "lineHeight": "22.5px", "fontWeight": "600", "letterSpacing": "-0.45px", "gap": "12px"},
+    ".search-trigger": {"width": "224px", "height": "39px", "borderRadius": "24px", "padding": "8px 12px"},
+    ".search-trigger kbd": {"fontSize": "12px", "lineHeight": "16px", "height": "20px", "borderRadius": "6px"},
+    ".nav-link": {"fontSize": "14px", "lineHeight": "20px", "minHeight": "32px", "borderRadius": "16px", "padding": "6px 6px 6px 12px"},
+    ".nav-link.is-active": {"fontWeight": "600"},
+    ".nav-depth-0 > summary": {"fontSize": "12px", "lineHeight": "16px", "fontWeight": "600", "letterSpacing": "0.3px", "textTransform": "uppercase"},
+    ".page-title": {"fontSize": "36px", "lineHeight": "45px", "fontWeight": "700", "letterSpacing": "-0.9px"},
+    ".page-content h2": {"fontSize": "24px", "lineHeight": "33px", "fontWeight": "600", "paddingTop": "18px", "letterSpacing": "-0.3px"},
+    ".page-content h3": {"fontSize": "20px", "lineHeight": "27.5px", "fontWeight": "600", "paddingTop": "10px", "letterSpacing": "-0.25px"},
+    ".page-content strong": {"fontWeight": "700"},
+    ".page-content p code": {"fontSize": "14px", "lineHeight": "20px", "padding": "1px 6px", "borderRadius": "4px"},
+    ".page-content pre": {"fontSize": "14px", "lineHeight": "20px", "padding": "10px 16px"},
+    ".codehilite": {"borderRadius": "16px", "borderTopWidth": "1px"},
+    ".page-content th": {"fontSize": "14px", "lineHeight": "20px", "fontWeight": "500", "padding": "8px 12px"},
+    ".page-content td": {"fontSize": "14px", "lineHeight": "20px", "padding": "8px 12px"},
+    ".page-pagination": {"marginTop": "24px", "gap": "12px"},
+    ".pagination-link": {"borderRadius": "16px", "padding": "16px", "height": "72px"},
+    ".pagination-link strong": {"fontSize": "16px", "lineHeight": "22px"},
+    ".page-outline a": {"fontSize": "14px", "lineHeight": "20px", "padding": "4px 12px", "borderRadius": "16px", "borderLeftWidth": "0px"},
+    ".page-outline .outline-label": {"fontSize": "12px", "lineHeight": "16px", "fontWeight": "600"},
+    ".outline-footer .theme-picker": {"gap": "8px"},
+    ".outline-footer .icon-button": {"width": "33px", "height": "33px"}
+  },
+  "desktop_boxes": {
+    ".site-header": {"x": 0, "y": 0, "width": 1440, "height": 64},
+    ".site-header .site-brand img": {"x": 32, "y": 16, "width": 32, "height": 32},
+    ".sidebar-panel": {"x": 12, "y": 88, "width": 284, "height": 896},
+    ".sidebar-scroll > .nav-list > .nav-item > .nav-link": {"x": 20, "y": 96, "width": 258, "height": 32},
+    ".page-main": {"x": 368, "y": 64, "width": 768},
+    ".page-title": {"x": 368, "y": 127.5, "height": 45},
+    ".page-outline": {"x": 1152, "y": 64, "width": 256, "height": 936},
+    ".outline-footer .theme-picker": {"y": 951, "height": 33},
+    ".search-trigger": {"x": 1184, "y": 12.5, "width": 224, "height": 39}
+  },
+  "responsive": [
+    {"viewport": 320, "x": 16, "width": 288, "title": "24px", "section": "18px", "subsection": "16px"},
+    {"viewport": 390, "x": 16, "width": 358, "title": "30px", "section": "20px", "subsection": "18px"},
+    {"viewport": 768, "x": 32, "width": 704, "title": "36px", "section": "24px", "subsection": "20px"},
+    {"viewport": 1024, "x": 368, "width": 624, "title": "36px", "section": "24px", "subsection": "20px"},
+    {"viewport": 1280, "x": 368, "width": 608, "title": "36px", "section": "24px", "subsection": "20px"},
+    {"viewport": 1440, "x": 368, "width": 768, "title": "36px", "section": "24px", "subsection": "20px"},
+    {"viewport": 1920, "x": 608, "width": 768, "title": "36px", "section": "24px", "subsection": "20px"}
+  ]
+}

@@ -1,6 +1,7 @@
 """Validate built documentation, including deployment under a project prefix."""
 
 from html.parser import HTMLParser
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -111,6 +112,25 @@ class SiteTests(unittest.TestCase):
         for path in self.pages:
             content = path.read_text(encoding="utf-8")
             self.assertNotRegex(content, r'<(?:script|img)[^>]+src="https?://')
+
+    def test_reference_font_identity(self):
+        reference = json.loads((ROOT / "tests/reference_theme.json").read_text(encoding="utf-8"))
+        for name, expected in reference["font_sha256"].items():
+            font = SITE / "assets/fonts" / name
+            with self.subTest(font=name):
+                self.assertEqual(hashlib.sha256(font.read_bytes()).hexdigest(), expected)
+
+    def test_interface_icon_attribution_and_paths(self):
+        license_text = (SITE / "assets/font-awesome-LICENSE.txt").read_text(encoding="utf-8")
+        self.assertIn("CC BY 4.0", license_text)
+        self.assertIn("Fonticons", license_text)
+        for path in self.pages:
+            content = path.read_text(encoding="utf-8")
+            for icon in re.findall(r"<svg\b.*?</svg>", content, re.S):
+                with self.subTest(page=path.relative_to(SITE)):
+                    self.assertIn("Font Awesome Free 7.0.0", icon)
+                    self.assertRegex(icon, r'<path d="[^"]+"')
+                    self.assertIn('aria-hidden="true"', icon)
 
     def test_no_template_leaks_or_credentials(self):
         for path in SITE.rglob("*"):

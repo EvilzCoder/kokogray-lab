@@ -1,0 +1,22 @@
+Font Awesome Free 7.0.0 icons
+Copyright 2025 Fonticons, Inc. (https://fontawesome.com)
+
+The interface SVG icons in theme/partials/icons.html are from Font Awesome
+Free 7.0.0. Their path data is unchanged; the SVG markup is wrapped in a
+Jinja macro with local sizing, accessible attributes, and currentColor.
+
+Source: https://github.com/FortAwesome/Font-Awesome/tree/7.0.0/svgs
+Upstream license: https://github.com/FortAwesome/Font-Awesome/blob/7.0.0/LICENSE.txt
+
+# Icons: CC BY 4.0 License
+
+The Font Awesome Free download is licensed under a Creative Commons
+Attribution 4.0 International License and applies to all icons packaged
+as SVG and JS file types.
+
+License: https://creativecommons.org/licenses/by/4.0/
+Legal code: https://creativecommons.org/licenses/by/4.0/legalcode
+
+Original attribution comments are retained in each rendered SVG.
+No Font Awesome font files, JavaScript, or brand icons are bundled.
+The Kokogray Lab logo is original and is not a Font Awesome icon.

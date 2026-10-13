@@ -10,7 +10,6 @@
     </details>
     {% else %}
     <a href="{{ item.url | url }}" class="nav-link{% if item.active %} is-active{% endif %}"{% if item.active %} aria-current="page"{% endif %}>
-      {% if depth == 0 %}{{ icon('book' if item.is_homepage else 'file') }}{% endif %}
       <span>{{ item.title }}</span>
     </a>
     {% endif %}

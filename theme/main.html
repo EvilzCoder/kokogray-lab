@@ -1,5 +1,6 @@
 {% from 'partials/icons.html' import icon %}
 {% from 'partials/navigation.html' import navigation, outline with context %}
+{% from 'partials/controls.html' import theme_picker %}
 <!doctype html>
 <html lang="en" data-theme="dark">
 <head>
@@ -27,8 +28,8 @@
         </a>
       </div>
       <div class="header-actions">
-        <a class="header-github" href="{{ config.repo_url }}" target="_blank" rel="noopener noreferrer">{{ icon('github') }}<span>GitHub</span>{{ icon('external', 'external-icon') }}</a>
-        <button class="search-trigger" type="button" data-open-search aria-haspopup="dialog" aria-label="Search documentation">{{ icon('search') }}<span>Search…</span><kbd><span data-shortcut-mod>Ctrl</span> K</kbd></button>
+        <a class="header-github" href="{{ config.repo_url }}" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <button class="search-trigger" type="button" data-open-search aria-haspopup="dialog" aria-label="Search documentation">{{ icon('search') }}<span class="search-placeholder">Search…</span><span class="search-shortcut"><kbd data-shortcut-mod>Ctrl</kbd><kbd>K</kbd></span></button>
       </div>
     </div>
   </header>
@@ -36,60 +37,64 @@
   <div class="site-layout">
     <div class="nav-backdrop" hidden data-close-nav></div>
     <aside class="site-sidebar" id="site-sidebar" aria-label="Site navigation">
-      <div class="mobile-sidebar-header"><span>Contents</span><button type="button" class="icon-button" data-close-nav aria-label="Close navigation">{{ icon('close') }}</button></div>
-      <nav class="sidebar-scroll" aria-label="Main navigation">{{ navigation(nav.items) }}</nav>
-      <footer class="sidebar-footer">
-        <a class="sidebar-caption" href="{{ nav.homepage.url | url }}">{{ icon('book') }}<span>Kokogray Lab</span></a>
-        <div class="theme-picker" role="group" aria-label="Color theme">
-          <button type="button" class="icon-button" data-set-theme="light" aria-label="Light theme" aria-pressed="false" title="Light theme">{{ icon('sun') }}</button>
-          <button type="button" class="icon-button" data-set-theme="dark" aria-label="Dark theme" aria-pressed="true" title="Dark theme">{{ icon('moon') }}</button>
-          <button type="button" class="icon-button" data-set-theme="system" aria-label="System theme" aria-pressed="false" title="System theme">{{ icon('monitor') }}</button>
-        </div>
-      </footer>
+      <div class="mobile-sidebar-header"><button type="button" class="icon-button" data-close-nav aria-label="Close navigation">{{ icon('close') }}</button><a class="site-brand" href="{{ nav.homepage.url | url }}"><img src="{{ 'assets/favicon.svg' | url }}" width="32" height="32" alt=""><span>{{ config.site_name }}</span></a></div>
+      <div class="sidebar-panel">
+        <nav class="sidebar-scroll" aria-label="Main navigation">{{ navigation(nav.items) }}</nav>
+        <footer class="sidebar-footer">
+          <a class="sidebar-caption" href="{{ nav.homepage.url | url }}">{{ icon('book') }}<span>{{ config.site_name }}</span></a>
+          <div class="drawer-theme">{{ theme_picker() }}</div>
+        </footer>
+      </div>
     </aside>
 
     <main id="main-content" class="page-main" tabindex="-1">
       {% block content %}
-      <div class="page-topline">
-        <nav class="breadcrumbs" aria-label="Breadcrumb">
-          <ol>
-            {% for ancestor in page.ancestors | reverse %}<li><span>{{ ancestor.title }}</span>{{ icon('chevron') }}</li>{% endfor %}
-            <li><span{% if not page.ancestors %} class="breadcrumb-root"{% endif %}>{{ page.title }}</span></li>
-          </ol>
-        </nav>
-        <button type="button" class="page-copy text-button" data-copy-page title="Copy page as Markdown">{{ icon('copy') }}<span>Copy page</span></button>
-      </div>
-      <h1 class="page-title">{{ page.title }}</h1>
-      {% if page.meta.description %}<p class="page-description">{{ page.meta.description }}</p>{% endif %}
-      <details class="mobile-outline">
-        <summary>{{ icon('list') }}<span>On this page</span>{{ icon('chevron') }}</summary>
-        <nav aria-label="On this page (mobile)">{{ outline(page.toc) }}</nav>
-      </details>
+      <header class="page-heading">
+        <div class="page-topline">
+          {% if page.ancestors %}
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <ol>
+              {% for ancestor in page.ancestors | reverse %}<li><span>{{ ancestor.title }}</span>{% if not loop.last %}{{ icon('chevron') }}{% endif %}</li>{% endfor %}
+            </ol>
+          </nav>
+          {% endif %}
+          {% if page.toc %}
+          <details class="mobile-outline">
+            <summary aria-label="On this page" title="On this page">{{ icon('list') }}<span class="sr-only">On this page</span></summary>
+            <nav aria-label="On this page (mobile)"><p class="outline-label">On this page</p>{{ outline(page.toc) }}</nav>
+          </details>
+          {% endif %}
+        </div>
+        <h1 class="page-title">{{ page.title }}</h1>
+        {% if page.meta.description %}<p class="page-description">{{ page.meta.description }}</p>{% endif %}
+      </header>
       <article class="page-content">{{ page.content }}</article>
       <nav class="page-pagination" aria-label="Previous and next pages">
         {% if page.previous_page %}
-        <a class="pagination-link previous" href="{{ page.previous_page.url | url }}">{{ icon('arrow-left') }}<span><small>Previous</small><strong>{{ page.previous_page.title }}</strong></span></a>
+        <a class="pagination-link previous" href="{{ page.previous_page.url | url }}">{{ icon('chevron') }}<span><small>Previous</small><strong>{{ page.previous_page.title }}</strong></span></a>
         {% endif %}
         {% if page.next_page %}
-        <a class="pagination-link next" href="{{ page.next_page.url | url }}"><span><small>Next</small><strong>{{ page.next_page.title }}</strong></span>{{ icon('arrow-right') }}</a>
+        <a class="pagination-link next" href="{{ page.next_page.url | url }}"><span><small>Next</small><strong>{{ page.next_page.title }}</strong></span>{{ icon('chevron') }}</a>
         {% endif %}
       </nav>
       <footer class="page-footer">
-        <span>{{ icon('clock') }}{% if page.meta.updated %}Updated {{ page.meta.updated }}{% else %}{{ config.site_name }}{% endif %}</span>
-        {% if page.edit_url %}<a href="{{ page.edit_url }}" target="_blank" rel="noopener noreferrer">Edit on GitHub {{ icon('external') }}</a>{% endif %}
+        <span>{% if page.meta.updated %}Updated {{ page.meta.updated }}{% else %}{{ config.site_name }}{% endif %}</span>
+        <div class="page-utilities">
+          <button type="button" class="text-button" data-copy-page title="Copy page as Markdown">{{ icon('copy') }}<span>Copy page</span></button>
+          <button type="button" class="text-button" data-copy-link>{{ icon('link') }}<span>Copy link</span></button>
+          {% if page.edit_url %}<a href="{{ page.edit_url }}" target="_blank" rel="noopener noreferrer">Edit on GitHub {{ icon('external') }}</a>{% endif %}
+        </div>
       </footer>
       {% endblock %}
+      <div class="mobile-page-theme">{{ theme_picker() }}</div>
     </main>
 
     <aside class="page-outline" aria-label="Page outline">
       {% if page and page.toc %}
       <p class="outline-label">{{ icon('list') }} On this page</p>
       <nav aria-label="On this page">{{ outline(page.toc) }}</nav>
-      <div class="outline-actions">
-        {% if page.edit_url %}<a href="{{ page.edit_url }}" target="_blank" rel="noopener noreferrer">{{ icon('github') }} Edit on GitHub</a>{% endif %}
-        <button type="button" class="text-button" data-copy-link>{{ icon('copy') }} Copy link</button>
-      </div>
       {% endif %}
+      <div class="outline-footer">{{ theme_picker() }}</div>
     </aside>
   </div>
 

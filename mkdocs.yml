@@ -1,0 +1,51 @@
+site_name: Kokogray Lab
+site_description: CTF writeups, cloud security notes, and lessons from the lab.
+site_url: https://evilzcoder.github.io/kokogray-lab/
+repo_url: https://github.com/EvilzCoder/kokogray-lab
+repo_name: EvilzCoder/kokogray-lab
+edit_uri: edit/main/docs/
+use_directory_urls: true
+strict: true
+
+theme:
+  name: null
+  custom_dir: theme
+  static_templates:
+    - 404.html
+
+nav:
+  - Welcome: index.md
+  - '2026':
+      - Lab notebook:
+          - Getting started: 2026/lab-notebook/getting-started.md
+          - Writeup template: 2026/lab-notebook/writeup-template.md
+  - Knowledge base:
+      - Cloud security: knowledge-base/cloud-security.md
+      - Web security: knowledge-base/web-security.md
+      - Tools & workflow: knowledge-base/tools-and-workflow.md
+  - About: about.md
+
+plugins:
+  - search:
+      indexing: full
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - fenced_code
+  - codehilite:
+      guess_lang: false
+  - tables
+  - toc:
+      permalink: '#'
+      permalink_title: Link to this heading
+      toc_depth: 2-3
+  - md_in_html
+
+hooks:
+  - scripts/hooks.py
+
+extra:
+  default_theme: dark
+  github_url: https://github.com/EvilzCoder/kokogray-lab

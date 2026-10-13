@@ -1,0 +1,27 @@
+{% from 'partials/icons.html' import icon %}
+{% macro navigation(items, depth=0) -%}
+<ul class="nav-list{% if depth %} nav-nested{% endif %}">
+  {% for item in items %}
+  <li class="nav-item">
+    {% if item.children %}
+    <details class="nav-group nav-depth-{{ depth }}"{% if item.active or depth == 0 %} open{% endif %}>
+      <summary><span>{{ item.title }}</span>{{ icon('chevron') }}</summary>
+      {{ navigation(item.children, depth + 1) }}
+    </details>
+    {% else %}
+    <a href="{{ item.url | url }}" class="nav-link{% if item.active %} is-active{% endif %}"{% if item.active %} aria-current="page"{% endif %}>
+      {% if depth == 0 %}{{ icon('book' if item.is_homepage else 'file') }}{% endif %}
+      <span>{{ item.title }}</span>
+    </a>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{%- endmacro %}
+{% macro outline(items) -%}
+<ul>
+  {% for item in items %}
+  <li><a href="{{ item.url }}">{{ item.title }}</a>{% if item.children %}{{ outline(item.children) }}{% endif %}</li>
+  {% endfor %}
+</ul>
+{%- endmacro %}

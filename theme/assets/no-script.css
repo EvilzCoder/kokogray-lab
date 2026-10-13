@@ -1,0 +1,25 @@
+.mobile-menu, .search-trigger, .theme-picker, .page-utilities button {
+  display: none !important;
+}
+
+@media (max-width: 1023px) {
+  .site-sidebar {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    padding: 24px 0;
+    transform: none;
+    visibility: visible;
+  }
+
+  .sidebar-panel {
+    flex: none;
+    margin-left: 0;
+  }
+
+  .sidebar-scroll { overflow: visible; }
+  .mobile-sidebar-header, .sidebar-footer { display: none; }
+}

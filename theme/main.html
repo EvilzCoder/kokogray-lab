@@ -14,6 +14,7 @@
   <link rel="preload" href="{{ 'assets/fonts/inter-latin.woff2' | url }}" as="font" type="font/woff2" crossorigin>
   <script src="{{ 'assets/theme-init.js' | url }}"></script>
   <link rel="stylesheet" href="{{ 'assets/styles.css' | url }}">
+  <noscript><link rel="stylesheet" href="{{ 'assets/no-script.css' | url }}"></noscript>
   <script src="{{ 'assets/app.js' | url }}" defer></script>
 </head>
 <body data-base-url="{{ base_url }}"{% if page %} data-page-url="{{ page.url }}" data-markdown-url="{{ page.meta.markdown_url | url }}"{% endif %}>

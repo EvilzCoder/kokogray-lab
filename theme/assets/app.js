@@ -327,8 +327,9 @@
 
   function openSearch(trigger) {
     if (dialog.open) return;
-    if (document.body.classList.contains("nav-open")) setNavigation(false, false);
-    lastSearchTrigger = trigger || document.activeElement;
+    const navigationOpen = document.body.classList.contains("nav-open");
+    lastSearchTrigger = navigationOpen ? menuButton : (trigger || document.activeElement);
+    if (navigationOpen) setNavigation(false, false);
     dialog.showModal();
     input.focus();
     input.select();

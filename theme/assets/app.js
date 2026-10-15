@@ -148,9 +148,7 @@
     const button = $(".code-wrap", block);
     const wrapped = block.dataset.wrap === "on" || (block.dataset.wrap === "auto" && phoneCode.matches);
     if (button) button.setAttribute("aria-pressed", String(wrapped));
-    const disclosure = $(".code-disclosure", block);
-    const overflowing = (!disclosure || disclosure.open) && pre.getClientRects().length > 0 &&
-      pre.scrollWidth > pre.clientWidth + 1;
+    const overflowing = pre.getClientRects().length > 0 && pre.scrollWidth > pre.clientWidth + 1;
     pre.tabIndex = overflowing ? 0 : -1;
     $(".code-scroll-hint", block).hidden = !overflowing;
   }
@@ -181,24 +179,11 @@
     button.textContent = "Copy";
     button.addEventListener("click", () => copy($("code", block).textContent.replace(/\n$/, ""), "Code copied"));
     actions.append(button);
-    $(".code-disclosure", block)?.addEventListener("toggle", () => updateCodeBlock(block));
   });
   updateCodeBlocks();
   phoneCode.addEventListener("change", updateCodeBlocks);
   window.addEventListener("resize", updateCodeBlocks);
   document.fonts.ready.then(updateCodeBlocks);
-
-  const printDisclosures = new Set();
-  window.addEventListener("beforeprint", () => {
-    $$(".code-disclosure:not([open])").forEach(details => {
-      printDisclosures.add(details);
-      details.open = true;
-    });
-  });
-  window.addEventListener("afterprint", () => {
-    printDisclosures.forEach(details => { details.open = false; });
-    printDisclosures.clear();
-  });
 
   const headings = $$(".page-content h2[id], .page-content h3[id]");
   const outlineLinks = $$(".page-outline nav a");

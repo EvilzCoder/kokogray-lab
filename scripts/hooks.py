@@ -19,7 +19,6 @@ class CodeBlockFormatter(HtmlFormatter):
         self.language = language if re.fullmatch(r"[\w.+#-]+", language) else "text"
         self.code_filename = self.filename
         self.filename = ""
-        self.collapsible = str(options.get("collapse", "false")).lower() == "true"
         self.plain_text = self.language in {"text", "txt", "plaintext"}
         self.flow_text = self.plain_text and options.get("layout") == "flow"
         self.text_title = str(options.get("title", "")) if self.plain_text else ""
@@ -53,20 +52,9 @@ class CodeBlockFormatter(HtmlFormatter):
             if self.preserve_lines:
                 yield 0, '<span class="code-scroll-hint" hidden aria-hidden="true">Scroll horizontally &rarr;</span>'
             yield 0, '</div><div class="code-actions"></div></div>'
-        if self.collapsible:
-            noun = "contract" if self.language == "solidity" else "text" if self.preserve_lines else "code"
-            title = f': {escape(self.text_title)}' if self.text_title else ""
-            yield 0, (
-                '<details class="code-disclosure"><summary>'
-                f'<span class="code-show">Show full {noun}</span>'
-                f'<span class="code-hide">Hide full {noun}</span>{title}'
-                '</summary><div class="code-body">'
-            )
         yield 0, f'<pre tabindex="0" role="group" aria-label="{region}"><code class="language-{language}">'
         yield from source
         yield 0, '</code></pre>'
-        if self.collapsible:
-            yield 0, '</div></details>'
         if self.plain_text or not self.preserve_lines:
             yield 0, '<div class="code-scroll-hint" hidden aria-hidden="true">Scroll horizontally to read &rarr;</div>'
 

@@ -174,7 +174,6 @@ class CodeBlockFormatterTests(unittest.TestCase):
         source: str,
         wrap: str,
         filename: str | None = None,
-        collapsed: bool = False,
         title: str | None = None,
     ) -> None:
         self.assertTrue(has_class(block, "code-block"))
@@ -207,18 +206,13 @@ class CodeBlockFormatterTests(unittest.TestCase):
         if not plain_text:
             self.assertEqual(descendants(toolbar, class_name="code-scroll-hint"), [hint] if wrap == "preserve" else [])
 
-        details = descendants(block, tag="details", class_name="code-disclosure")
-        self.assertEqual(len(details), int(collapsed))
-        if collapsed:
-            self.assertNotIn("open", details[0].attributes)
-            summary = only(descendants(details[0], tag="summary"), "disclosure summary")
-            self.assertIn("Show full", text_content(summary))
-            self.assertIn("Hide full", text_content(summary))
-            code_parent = only(descendants(details[0], class_name="code-body"), "disclosure body")
-        else:
-            code_parent = block
+        self.assertEqual(descendants(block, tag="details"), [])
+        self.assertEqual(descendants(block, tag="summary"), [])
+        self.assertEqual(descendants(block, class_name="code-disclosure"), [])
 
-        pre = only(descendants(code_parent, tag="pre"), "code pre")
+        pre = only(descendants(block, tag="pre"), "code pre")
+        self.assertIn(pre, block.children)
+        self.assertNotIn("hidden", pre.attributes)
         self.assertEqual(pre.attributes.get("role"), "group")
         self.assertEqual(pre.attributes.get("tabindex"), "0")
         self.assertEqual(
@@ -273,7 +267,7 @@ class CodeBlockFormatterTests(unittest.TestCase):
                     filename=filename,
                 )
 
-    def test_explicit_collapse_wraps_the_complete_source_in_a_closed_disclosure(self):
+    def test_legacy_collapse_attribute_cannot_hide_contract_source(self):
         source = "contract Vault {\n    function unlock() external {}\n}"
         rendered = render_markdown(
             f'``` {{ .solidity filename="Vault.sol" collapse="true" }}\n{source}\n```'
@@ -287,18 +281,14 @@ class CodeBlockFormatterTests(unittest.TestCase):
             source=source,
             wrap="auto",
             filename="Vault.sol",
-            collapsed=True,
         )
         self.assertEqual(text_content(only(descendants(block, tag="code"), "code element")).count("unlock"), 1)
 
-    def test_preserved_text_disclosure_keeps_complete_source_without_a_toolbar(self):
+    def test_legacy_collapse_attribute_cannot_hide_preserved_text(self):
         source = "left  = 00 01\nright = 10 11\n        -----\nresult: 10 11"
         rendered = render_markdown(f'```{{.text collapse="true"}}\n{source}\n```')
         block = only(descendants(Document(rendered).root, class_name="code-block"), "text block")
-        self.assert_block(block, language="text", source=source, wrap="preserve", collapsed=True)
-        summary = only(descendants(block, tag="summary"), "text disclosure summary")
-        self.assertIn("Show full text", text_content(summary))
-        self.assertIn("Hide full text", text_content(summary))
+        self.assert_block(block, language="text", source=source, wrap="preserve")
 
     def test_flow_layout_is_opt_in_and_only_applies_to_plain_text(self):
         source = "value = 00 01 02 03\n\nresult = 10 11 12 13"
@@ -315,14 +305,14 @@ class CodeBlockFormatterTests(unittest.TestCase):
     def test_text_titles_are_escaped_and_never_enter_the_copyable_source(self):
         title = '<img src=x onerror="alert(1)">'
         source = "left  = 00 01\nright = 10 11"
-        rendered = highlight(source, TextLexer(), CodeBlockFormatter("language-text", collapse=True, title=title))
+        rendered = highlight(source, TextLexer(), CodeBlockFormatter("language-text", title=title))
         document = Document(rendered)
         block = only(descendants(document.root, class_name="code-block"), "text block")
-        self.assert_block(block, language="text", source=source, wrap="preserve", collapsed=True, title=title)
-        summary = only(descendants(block, tag="summary"), "disclosure summary")
-        self.assertIn(title, text_content(summary))
+        self.assert_block(block, language="text", source=source, wrap="preserve", title=title)
+        self.assertNotIn(title, text_content(block))
         self.assertNotIn("img", document.tags)
         self.assertNotIn("<img", rendered)
+        self.assertIn("&lt;img", rendered)
 
     def test_unspecified_and_false_collapse_attributes_do_not_create_disclosures(self):
         rendered = render_markdown(
@@ -479,50 +469,50 @@ class MagicVaultCodeBlockBuildTests(unittest.TestCase):
             body_without_front_matter(self.markdown),
         )
 
-    def test_full_contracts_and_long_text_examples_have_named_disclosures(self):
+    def test_full_contracts_and_text_examples_have_no_disclosures(self):
         filenames = [
             text_content(filename)
             for filename in descendants(self.document.root, class_name="code-filename")
         ]
         self.assertEqual(filenames, ["Setup.sol", "Vault.sol", "Solver.sol"])
 
-        text_fences = [fence for fence in self.fences if fence.language == "text"]
-        long_examples = [fence for fence in text_fences if len(fence.source.strip("\n").splitlines()) > 6]
-        self.assertEqual(len(long_examples), 12)
-        self.assertEqual([fence for fence in text_fences if fence.attribute("collapse") == "true"], long_examples)
-        self.assertTrue(all(fence.attribute("title") for fence in long_examples))
-        for fence, block in zip(self.fences, self.blocks, strict=True):
-            if fence in long_examples:
-                summary = only(descendants(block, tag="summary"), "text example summary")
-                self.assertIn(fence.attribute("title"), text_content(summary))
+        for index, (fence, block) in enumerate(zip(self.fences, self.blocks, strict=True), start=1):
+            with self.subTest(block=index, language=fence.language):
+                self.assertIsNone(fence.attribute("collapse"))
+                self.assertEqual(descendants(block, tag="details"), [])
+                self.assertEqual(descendants(block, tag="summary"), [])
+                self.assertEqual(descendants(block, class_name="code-disclosure"), [])
+                pre = only(descendants(block, tag="pre"), "code pre")
+                self.assertIn(pre, block.children)
+                self.assertNotIn("hidden", block.attributes)
+                self.assertNotIn("hidden", pre.attributes)
+                if fence.attribute("title"):
+                    self.assertEqual(pre.attributes.get("aria-label"), f'{fence.attribute("title")} block')
 
-        details = descendants(self.document.root, tag="details", class_name="code-disclosure")
-        self.assertEqual(len(details), 14)
-        self.assertTrue(all("open" not in disclosure.attributes for disclosure in details))
-        for block in self.blocks:
-            if block.attributes.get("data-language") != "text":
-                continue
-            for summary in descendants(block, tag="summary"):
-                self.assertIn("Show full text", text_content(summary))
-                self.assertIn("Hide full text", text_content(summary))
-
-        blocks_by_filename = {
-            text_content(only(descendants(block, class_name="code-filename"), "filename label")): block
-            for block in self.blocks
-            if descendants(block, class_name="code-filename")
+    def test_shift_examples_keep_short_byte_rows_and_separate_discarded_bytes(self):
+        fixtures = {
+            "Right shift": (6, "00 00 00 00 10 23 32 45", "54 67 76 89"),
+            "Left shift": (5, "32 45 54 67 76 89 00 00", "10 23"),
         }
-        self.assertEqual(set(blocks_by_filename), {"Setup.sol", "Vault.sol", "Solver.sol"})
-        self.assertEqual(descendants(blocks_by_filename["Setup.sol"], tag="details", class_name="code-disclosure"), [])
-        for filename in ("Vault.sol", "Solver.sol"):
-            with self.subTest(filename=filename):
-                disclosure = only(
-                    descendants(blocks_by_filename[filename], tag="details", class_name="code-disclosure"),
-                    "collapsed disclosure",
-                )
-                summary = only(descendants(disclosure, tag="summary"), "disclosure summary")
-                self.assertIn("Show full contract", text_content(summary))
-                self.assertIn("Hide full contract", text_content(summary))
-                self.assertEqual(len(descendants(disclosure, class_name="code-body")), 1)
+        original = "10 23 32 45 54 67 76 89"
+        for title, (line_count, shifted, discarded) in fixtures.items():
+            with self.subTest(title=title):
+                matching = [fence for fence in self.fences if fence.attribute("title") == title]
+                self.assertEqual(len(matching), 1)
+                fence = matching[0]
+                self.assertEqual(fence.language, "text")
+                self.assertIsNone(fence.attribute("layout"), "Shift byte rows must keep their alignment")
+                lines = fence.source.strip("\n").splitlines()
+                self.assertEqual(len(lines), line_count)
+                self.assertEqual(lines[1], original)
+                self.assertEqual(lines[3], shifted)
+                self.assertEqual(len(lines[1]), 23)
+                self.assertEqual(len(lines[3]), 23)
+                self.assertEqual(lines[-1], f"ပျောက်: {discarded}")
+                self.assertTrue(all(line == line.strip() for line in lines))
+                self.assertNotIn("[", fence.source)
+                self.assertNotIn("→", fence.source)
+                self.assertNotIn("←", fence.source)
 
     def test_only_independent_text_explanations_wrap(self):
         text_fences = [fence for fence in self.fences if fence.language == "text"]

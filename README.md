@@ -74,29 +74,29 @@ The starter notebook includes a [writeup template](docs/2026/lab-notebook/writeu
 
 Always label fences: `solidity`, `python`, or the relevant language for source; `sh` for shell commands; `console` for terminal transcripts; and `text` for diagrams, byte layouts, and explanatory output. Language guessing stays disabled so plain output is not accidentally highlighted.
 
-Use fence attributes for filenames and an optional full-code disclosure:
+Use fence attributes for filenames:
 
 ````markdown
-```{.solidity filename="Vault.sol" collapse="true"}
+```{.solidity filename="Vault.sol"}
 contract Vault {
     // Complete source goes here.
 }
 ```
 ````
 
-Omit `collapse="true"` for short snippets. Disclosures are native HTML and can be opened without JavaScript. Keep the full source in the fence: Copy includes it even when its disclosure is closed. Format long expressions across lines and dedent standalone snippets without changing their behavior.
+Every code and text block is fully visible by default, including full contract listings. There are no collapse, expand, or Show/Hide controls. Keep the full source in the fence for reading, copying, and printing. Format long expressions across lines and dedent standalone snippets without changing their behavior.
 
 Source code wraps by default on phones; the toolbar's **Wrap** toggle can preserve source lines or enable wrapping on desktop. Wrapping is visual only and never changes copied text. Source and terminal blocks keep their toolbars; plain `text` examples use a compact layout with a separate 44px Copy target instead of a full language toolbar. Controls never cover the source. Line-number options are intentionally disabled so every copyable block keeps a single clean source container.
 
-Plain text preserves columns by default for ASCII diagrams and byte layouts. Use `{.text layout="flow"}` for independent equations, prose, or results that can safely wrap to the reading width. Do not use it for aligned arrows or byte columns. For long examples (more than six lines in Magic Vault), add a descriptive disclosure title; short examples remain visible:
+Plain text preserves columns by default for ASCII diagrams and byte layouts. Use `{.text layout="flow"}` for independent equations, prose, or results that can safely wrap to the reading width. Do not use it for aligned arrows or byte columns. An optional title gives a text block an accessible label without adding a toolbar or hiding its content:
 
 ````markdown
-```{.text collapse="true" title="Byte layout"}
-...complete aligned diagram...
+```{.text title="Byte layout"}
+10 23 32 45 54 67 76 89
 ```
 ````
 
-Text disclosures share their top row with Copy, work by touch or keyboard without JavaScript, and retain the complete original text for copying and printing. Avoid squeezing long diagrams into tiny type or clipping them inside vertical scrollboxes.
+Keep byte rows short and put discarded bytes on separate lines rather than beside a wide diagram. All examples remain readable without JavaScript and print in full. Avoid squeezing diagrams into tiny type or clipping them inside vertical scrollboxes.
 
 ## Test
 

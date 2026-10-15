@@ -87,7 +87,7 @@ function isSolved() public view returns (bool) {
 
 ### Vault.sol
 
-```{.solidity filename="Vault.sol" collapse="true"}
+```{.solidity filename="Vault.sol"}
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
@@ -320,7 +320,7 @@ _secret ကို တွက်ထုတ်ဖို့ ပထမ bytes32 passphr
 
 ထို့နောက် ရလာတဲ့ uint256 value ကို bytes32 အဖြစ် ပြောင်းပါတယ်။ bytes32 တန်ဖိုးကို bytes16 အဖြစ် cast လုပ်လိုက်တဲ့အခါ အရှေ့ဆုံး 16 bytes ကို ယူပြီး အနောက်ဆုံး 16 bytes ကို ဖြတ်ချပါတယ်။ [00] နဲ့ အစားထိုးတာ မဟုတ်ပါဘူး။
 
-```{.text collapse="true" title="Bytes32 to bytes16"}
+```{.text title="Bytes32 to bytes16"}
 ဥပမာ passphrase နဲ့ _key1 ကို XOR လုပ်ပြီး ရလာတဲ့ bytes32 က
 
 0x11223344556677889900aabbccddeeffffeeddccbbaa00998877665544332211
@@ -372,31 +372,25 @@ return (_secret >> 32 | _secret << 16);
 
 ရလာတဲ့ bytes8 _secret တန်ဖိုးကို ညာဘက် 32-bit ရွှေ့ထားတဲ့ ရလဒ်တခုနဲ့ ဘယ်ဘက် 16-bit ရွှေ့ထားတဲ့ ရလဒ်တခု သီးသန့်တွက်ပါတယ်။ ညာဘက်ရွှေ့ပြီးသားကို ဆက်ပြီး ဘယ်ဘက်ရွှေ့တာ မဟုတ်ပါဘူး။ ရလဒ်နှစ်ခုကို | operator နဲ့ OR ပါမယ်။
 
-```{.text collapse="true" title="Right shift"}
-Example
-
+```{.text title="Right shift"}
 မူလ:
-[10] [23] [32] [45] [54] [67] [76] [89]
-
+10 23 32 45 54 67 76 89
 ညာဘက် ၄ ကွက် ရွှေ့:
-[00] [00] [00] [00] [10] [23] [32] [45]  →  [54] [67] [76] [89]
-                                          ဘောင်အပြင်ရောက်လို့ ပျောက်
-
+00 00 00 00 10 23 32 45
+ဘောင်အပြင်ရောက်လို့
+ပျောက်: 54 67 76 89
 ```
 ```{.text layout="flow"}
 ရလဒ် : right == 0x0000000010233245;
 
 ```
 
-```{.text collapse="true" title="Left shift"}
-Example
-
+```{.text title="Left shift"}
 မူလ:
-              [10] [23] [32] [45] [54] [67] [76] [89]
-
+10 23 32 45 54 67 76 89
 ဘယ်ဘက် ၂ ကွက် ရွှေ့:
-[10] [23]  ←  [32] [45] [54] [67] [76] [89] [00] [00]
-ပျောက်
+32 45 54 67 76 89 00 00
+ပျောက်: 10 23
 ```
 ```{.text layout="flow"}
 ရလဒ် : left == 0x3245546776890000;
@@ -404,7 +398,7 @@ Example
 
 ရလာတဲ့ left နဲ့ right value တွေကို OR မယ် ဆိုရင် အဖြေက ဒီလိုရပါတယ်။ bitwise OR ရဲ့ သဘောတရားက နေရာတူ bit နှစ်ခုကို နှိုင်းယှဉ်ပြီး တစ်ခုခုက 1 ဖြစ်ရင် 1 ထုတ်ပေးတယ်။
 
-```{.text collapse="true" title="Bitwise OR"}
+```{.text title="Bitwise OR"}
 right = 00 00 00 00 10 23 32 45
 left  = 32 45 54 67 76 89 00 00
         -----------------------
@@ -435,7 +429,7 @@ OR   = 1010 1011 = 0xAB
 
 ### Architecture overview
 
-```{.text collapse="true" title="Architecture"}
+```{.text title="Architecture"}
              Setup ကို deploy လုပ်သူ
                        │
                        │ 1 ETH နဲ့ deploy
@@ -510,7 +504,7 @@ bytes16 : 0x3245546776ab32450000000000000000
 
 ပြီးတော့ >> 64 ဆိုပြီး ညာဘက်ကို 64-bit ရွှေ့ပါတယ်။ 8-bit က 1 byte ဖြစ်တဲ့အတွက် 64-bit ဆိုရင် 8 bytes ဖြစ်ပါတယ်။
 
-```{.text collapse="true" title="64-bit shift"}
+```{.text title="64-bit shift"}
 မူလ:
 [32][45][54][67][76][ab][32][45][00][00][00][00][00][00][00][00]
 
@@ -567,7 +561,7 @@ require(uint64(_input) == _secretKey, "Case 2 failed");
 
 uint128 ကနေ uint64 အဖြစ် ပြောင်းလိုက်တဲ့အချိန်မှာ အရှေ့ပိုင်း 64-bit ကို ဖြတ်ချပြီး အနောက်ဆုံး 64-bit ကိုပဲ ယူပါတယ်။
 
-```{.text collapse="true" title="Input byte layout"}
+```{.text title="Input byte layout"}
 _input : 0x11223344556677883245546776ab3245
 
 အရှေ့ပိုင်း                အနောက်ပိုင်း
@@ -618,7 +612,7 @@ uint64(uint160(owner)) : 0x1122334455667788
 
 ဒီမှာ owner က ဘယ်သူလဲ ဆိုတာ ပြန်ကြည့်ပါမယ်။ အပေါ်က constructor() မှာ ရှင်းထားတဲ့အတိုင်း Vault ကို new Vault() နဲ့ ဖန်တီးတာက Setup Contract ဖြစ်လို့ owner က Setup Contract ရဲ့ address ဖြစ်ပါတယ်။ Vault ရဲ့ address ကိုယ်တိုင် မဟုတ်ပါဘူး။
 
-```{.text layout="flow" collapse="true" title="Constructor values"}
+```{.text layout="flow" title="Constructor values"}
 Vault constructor() ထဲမှာ
 
 msg.sender    = Setup Contract address
@@ -634,7 +628,7 @@ map.holder    = Vault Contract address
 
 condition သုံးခုကို ပြန်ပေါင်းကြည့်လိုက်ရင် ကျွန်တော်တို့ ထည့်ပေးရမဲ့ password ပုံစံက ဒီလိုဖြစ်ပါတယ်။
 
-```{.text collapse="true" title="Password layout"}
+```{.text title="Password layout"}
                   bytes16 _password
 
 [ owner ရဲ့ နောက်ဆုံး 8 bytes ][ _secretKey 8 bytes ]
@@ -710,7 +704,7 @@ bytes8 magicPassword = (secret >> 32) | (secret << 16);
 
 ဒါကြောင့် helper contract တခုထဲမှာ key ကို တွက်ပြီး အဲ့ transaction တခုတည်းအတွင်းမှာပဲ Vault ရဲ့ unlock() ကို ဆက်ခေါ်ပေးတဲ့နည်းကို သုံးပါမယ်။ ဒီလိုဆို helper contract နဲ့ Vault နှစ်ခုလုံးက block.number ၊ block.timestamp နဲ့ အရင် block တွေရဲ့ blockhash တွေကို တူတူပဲ မြင်ရမှာပါ။ nonce ကိုတော့ Vault ဆီက ဖတ်ပြီး helper ဘက်မှာ local variable နဲ့ တွက်ရမှာဖြစ်ပါတယ်။
 
-```{.text collapse="true" title="Helper call flow"}
+```{.text title="Helper call flow"}
 Wallet က helper contract ကို ခေါ်မယ်
                   │
                   ▼
@@ -737,7 +731,7 @@ unlock() က condition သုံးခုလုံး ကျော်သွာ�
 
 အပေါ်မှာ ရှင်းခဲ့တဲ့ helper contract ပုံစံကို ကျွန်တော်က Solver.sol နဲ့ ရေးပြီး ဖြေရှင်းခဲ့ပါတယ်။ code အပြည့်အစုံကို အရင်ကြည့်ပါမယ်။
 
-```{.solidity filename="Solver.sol" collapse="true"}
+```{.solidity filename="Solver.sol"}
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
@@ -901,7 +895,7 @@ nonce = nonce + 1;
 
 Vault က _generateKey() တခါခေါ်ပြီးတိုင်း nonce ကို 1 တိုးတာကြောင့် Solver ဘက်မှာလည်း key1 တွက်ပြီးတာနဲ့ local nonce ကို 1 တိုးပေးရပါတယ်။ ဒါမှ key2 တွက်တဲ့နေရာမှာ သုံးတဲ့ nonce က Vault နဲ့ တူမှာဖြစ်ပါတယ်။
 
-```{.text layout="flow" collapse="true" title="Nonce calculation"}
+```{.text layout="flow" title="Nonce calculation"}
 Vault ဆီက ဖတ်လာတဲ့ nonce = n
 
 Solver တွက်တဲ့အချိန်
@@ -977,7 +971,7 @@ password ရပြီဆိုတာနဲ့ Vault ရဲ့ unlock() ကို
 
 unlock() အောင်မြင်ရင် isUnlocked က true ဖြစ်သွားပြီး နောက်တကြောင်းက claimContent() ကို ဆက်ခေါ်ပါတယ်။ ဒီ call နှစ်ခုလုံးမှာ Vault က မြင်တဲ့ msg.sender က Solver Contract ရဲ့ address ဖြစ်ပါတယ်။ Wallet က solve() ကို စခေါ်ခဲ့ပေမဲ့ Vault ကို တိုက်ရိုက်ခေါ်တာက Solver ဖြစ်နေလို့ပါ။
 
-```{.text collapse="true" title="Contract call flow"}
+```{.text title="Contract call flow"}
 Wallet
   │
   └── Solver.solve(Vault address)

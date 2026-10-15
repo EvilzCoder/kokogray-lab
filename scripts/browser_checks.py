@@ -200,6 +200,22 @@ def contrast_ratio(foreground, background):
     return (high + .05) / (low + .05)
 
 
+def magic_vault_fences():
+    """Return Magic Vault fence metadata in article order for byte-for-byte checks."""
+
+    source = (ROOT / "docs/introduction-to-blockchain/magic-vault.md").read_text(encoding="utf-8")
+    pattern = re.compile(
+        r"^```(?P<info>[^\r\n]*)\r?\n(?P<body>.*?)(?=^```[ \t]*$)^```[ \t]*$",
+        re.MULTILINE | re.DOTALL,
+    )
+    fences = [
+        (match.group("info"), match.group("body").strip("\n"))
+        for match in pattern.finditer(source)
+    ]
+    assert len(fences) == 61, f"Expected 61 Magic Vault fences, found {len(fences)}"
+    return fences
+
+
 def check_code_blocks(browser, base, origin, checks, errors, failures):
     context = browser.new_context(
         viewport={"width": 390, "height": 844}, has_touch=True, reduced_motion="reduce",
@@ -209,9 +225,38 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
     page.on("pageerror", lambda error: errors.append(str(error)))
     page.on("response", lambda response: failures.append(f"{response.status} {response.url}") if response.status >= 400 else None)
     article = base + "introduction-to-blockchain/magic-vault/"
-    source = (ROOT / "docs/introduction-to-blockchain/magic-vault.md").read_text(encoding="utf-8")
-    expected_contracts = dict(re.findall(r'```\{\.solidity filename="([^"]+)"[^\n]*\}\n(.*?)\n```', source, re.S))
+    fences = magic_vault_fences()
+    expected_sources = [source for _, source in fences]
+    expected_contracts = {
+        re.search(r'filename="([^"]+)"', info).group(1): source
+        for info, source in fences
+        if re.search(r'filename="([^"]+)"', info)
+    }
     assert set(expected_contracts) == {"Setup.sol", "Vault.sol", "Solver.sol"}
+
+    def assert_all_pre_visible(target):
+        pre = target.locator(".code-block pre")
+        expect(pre).to_have_count(61)
+        assert pre.evaluate_all(
+            "elements => elements.every(element => element.checkVisibility({contentVisibilityAuto: true}) && "
+            "element.scrollHeight <= element.clientHeight + 1)"
+        ), "Every source listing must be visible and vertically unclipped without opening a disclosure"
+
+    def assert_rendered_sources(target):
+        actual = [
+            text.removesuffix("\n")
+            for text in target.locator(".code-block code").all_text_contents()
+        ]
+        assert actual == expected_sources, "Rendered listings do not match their Markdown source bytes"
+
+    def copy_every_listing():
+        for index, expected_source in enumerate(expected_sources):
+            block = page.locator(".code-block").nth(index)
+            block.get_by_role("button", name="Copy code", exact=True).click()
+            page.wait_for_function(
+                "async expected => await navigator.clipboard.readText() === expected",
+                arg=expected_source,
+            )
 
     for width in (320, 390, 768, 1440):
         for theme in ("dark", "light"):
@@ -224,42 +269,23 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
             expect(page.locator('.code-block[data-language="solidity"]')).to_have_count(33)
             expect(page.locator('.code-block[data-language="console"]')).to_have_count(1)
             expect(page.locator('.code-block[data-language="text"]')).to_have_count(27)
-            expect(page.locator(".code-disclosure:not([open])")).to_have_count(14)
-            text_blocks = page.locator('.text-block').filter(has=page.locator('.code-disclosure'))
-            expect(text_blocks).to_have_count(12)
-            for index in range(12):
-                block = text_blocks.nth(index)
-                disclosure = block.locator('.code-disclosure')
-                assert block.bounding_box()["height"] <= 90
-                expect(disclosure.locator(".code-show")).to_have_text("Show full text")
-                expect(block.locator(".code-scroll-hint")).not_to_be_visible()
-                expect(block.locator("pre")).to_have_attribute("tabindex", "-1")
-                expected_text = block.locator("code").text_content().removesuffix("\n")
-                copy_button = block.get_by_role("button", name="Copy code", exact=True)
-                copy_button.focus()
-                copy_button.press("Enter")
-                page.wait_for_function("async expected => await navigator.clipboard.readText() === expected", arg=expected_text)
-                disclosure.locator("summary").focus()
-                disclosure.locator("summary").press("Enter")
-                expect(disclosure.locator("pre")).to_be_visible()
+            expect(page.locator(".code-block details, .code-block summary, .code-disclosure")).to_have_count(0)
+            assert_all_pre_visible(page)
+            assert_rendered_sources(page)
 
             for filename, expected_source in expected_contracts.items():
                 block = page.locator(".code-block").filter(has=page.locator(".code-filename", has_text=filename))
                 expect(block.locator(".code-language")).to_have_text("Solidity")
                 assert block.locator("code").text_content().removesuffix("\n") == expected_source
-                if filename != "Setup.sol":
-                    assert block.bounding_box()["height"] < 160, filename
+                expect(block.locator("pre")).to_be_visible()
                 button = block.get_by_role("button", name="Copy code", exact=True)
                 button.focus()
                 button.press("Enter")
                 expect(page.locator(".toast")).to_have_text("Code copied")
                 page.wait_for_function("async expected => await navigator.clipboard.readText() === expected", arg=expected_source)
-                if filename != "Setup.sol":
-                    summary = block.locator("summary")
-                    summary.focus()
-                    summary.press("Enter")
-                    expect(block.locator(".code-disclosure")).to_have_attribute("open", "")
-                    expect(block.locator("pre")).to_be_visible()
+
+            if width == 390 and theme == "dark":
+                copy_every_listing()
 
             assert_no_horizontal_overflow(page)
             layout = page.locator(".code-block").evaluate_all("""blocks => blocks.map(block => {
@@ -280,6 +306,7 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
                 overflow: pre.scrollWidth - pre.clientWidth,
                 verticalOverflow: pre.scrollHeight - pre.clientHeight,
                 font: getComputedStyle(code).fontSize,
+                lineHeight: getComputedStyle(code).lineHeight,
                 whiteSpace: getComputedStyle(code).whiteSpace,
                 wrap: block.querySelector('.code-wrap')?.getAttribute('aria-pressed'),
                 copyHeight: copy.getBoundingClientRect().height,
@@ -294,9 +321,10 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
                     assert block.get("toolbarBottom") is None, block
                 else:
                     assert block["toolbarBottom"] <= block["preTop"] + .1, block
-                assert block["font"] == "14px", block
+                assert block["font"] == "14px" and block["lineHeight"] == "20px", block
                 assert block["verticalOverflow"] <= 1, block
                 assert block["role"] == "group", block
+                assert block["hintVisible"] == (block["overflow"] > 1), block
                 assert block["tabIndex"] == (0 if block["overflow"] > 1 else -1), block
                 if block["language"] == "solidity":
                     assert block["wrap"] == ("true" if width < 640 else "false"), block
@@ -316,8 +344,6 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
                     assert block["toolbarHeight"] <= (45 if width < 640 else 36), block
                     if width < 640:
                         assert block["copyHeight"] >= 44, block
-                if block["overflow"] > 1:
-                    assert block["hintVisible"], block
 
             tokens = page.locator('.code-block[data-language="solidity"] code span').evaluate_all("""elements => {
               const result = {};
@@ -353,14 +379,11 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
                 page.screenshot(path=str(RESULTS / f"code-{width}-{theme}-setup.png"))
                 vault.scroll_into_view_if_needed()
                 page.screenshot(path=str(RESULTS / f"code-{width}-{theme}-vault.png"))
-                vault.locator("summary").click()
-                vault.scroll_into_view_if_needed()
-                page.screenshot(path=str(RESULTS / f"code-{width}-{theme}-collapsed.png"))
 
-    checks.append("Magic Vault toolbars, exact full-contract copy, and keyboard disclosures in both themes")
+    checks.append("All 61 Magic Vault listings are visible immediately, byte-exact, and copyable in both themes")
     checks.append("Phone source wrapping, 44px controls, contained unwrapped diagrams, and no code overlays")
     checks.append("All rendered Solidity token categories meet 4.5:1 contrast in light and dark themes")
-    checks.append("Compact text examples and twelve named disclosures preserve full text and keyboard copying")
+    checks.append("Text listings remain fully visible without disclosure controls or height caps")
 
     page.set_viewport_size({"width": 390, "height": 844})
     page.goto(article, wait_until="networkidle")
@@ -373,17 +396,20 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
     expect(first_wrap).to_have_attribute("aria-pressed", "true")
     checks.append("Responsive wrap defaults track viewport changes and preserve explicit block choices")
 
-    page.evaluate("window.dispatchEvent(new Event('beforeprint'))")
-    expect(page.locator(".code-disclosure[open]")).to_have_count(14)
+    expect(page.locator(".code-block details, .code-block summary, .code-disclosure")).to_have_count(0)
+    assert_all_pre_visible(page)
     page.emulate_media(media="print")
-    for index in range(14):
-        expect(page.locator(".code-disclosure pre").nth(index)).to_be_visible()
+    expect(page.locator(".code-block pre")).to_have_count(61)
+    assert page.locator(".code-block pre").evaluate_all(
+        "elements => elements.every(element => element.checkVisibility({contentVisibilityAuto: true}) && "
+        "element.scrollHeight <= element.clientHeight + 1)"
+    ), "Printing must show every listing, fully unclipped, without opening anything"
     expect(page.locator(".code-copy:visible")).to_have_count(0)
     expect(page.locator(".code-scroll-hint:visible")).to_have_count(0)
     page.emulate_media(media="screen")
-    page.evaluate("window.dispatchEvent(new Event('afterprint'))")
-    expect(page.locator(".code-disclosure:not([open])")).to_have_count(14)
-    checks.append("Printing expands full contracts and text diagrams, then restores disclosure states")
+    assert_all_pre_visible(page)
+    assert_rendered_sources(page)
+    checks.append("Printing shows all 61 listings directly without disclosure state changes")
     context.close()
 
     no_js = browser.new_context(java_script_enabled=False, viewport={"width": 390, "height": 844})
@@ -394,32 +420,28 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
         expect(static_page.locator(".code-toolbar")).to_have_count(34)
         expect(static_page.locator(".text-block .code-toolbar")).to_have_count(0)
         expect(static_page.locator(".code-actions button")).to_have_count(0)
-        preserved = static_page.locator('.code-block[data-wrap="preserve"]')
-        visible_preserved = preserved.filter(has_not=static_page.locator('.code-disclosure:not([open])')).count()
-        expect(preserved.locator('.code-scroll-hint:visible')).to_have_count(visible_preserved)
+        expect(static_page.locator(".code-block details, .code-block summary, .code-disclosure")).to_have_count(0)
         expect(static_page.locator('.code-block pre[role="region"]')).to_have_count(0)
-        expect(static_page.locator(".code-disclosure:not([open])")).to_have_count(14)
         expect(static_page.locator("[data-toggle-theme]")).not_to_be_visible()
-        for index in range(14):
-            disclosure = static_page.locator(".code-disclosure").nth(index)
-            disclosure.locator("summary").focus()
-            disclosure.locator("summary").press("Enter")
-            expect(disclosure.locator("pre")).to_be_visible()
+        assert_all_pre_visible(static_page)
+        assert_rendered_sources(static_page)
+        preserved = static_page.locator('.code-block[data-wrap="preserve"]')
         expect(preserved.locator('.code-scroll-hint:visible')).to_have_count(preserved.count())
         expect(static_page.locator('.text-block[data-wrap="flow"] .code-scroll-hint:visible')).to_have_count(0)
+        for label in ("Right shift block", "Left shift block"):
+            pre = static_page.locator(f'pre[aria-label="{label}"]')
+            expect(pre).to_be_visible()
+            assert pre.evaluate("element => element.scrollWidth <= element.clientWidth + 1"), (width, label)
         assert_no_horizontal_overflow(static_page)
         assert static_page.locator('.code-block[data-language="solidity"] pre').evaluate_all(
             "elements => elements.every(el => el.scrollWidth <= el.clientWidth + 1)"
         )
     static_page.goto(article, wait_until="networkidle")
     static_page.emulate_media(media="print")
-    for index in range(14):
-        pre = static_page.locator(".code-disclosure pre").nth(index)
-        expect(pre).to_be_visible()
-        assert pre.evaluate("element => element.checkVisibility({contentVisibilityAuto: true})")
+    assert_all_pre_visible(static_page)
     expect(static_page.locator(".code-scroll-hint:visible")).to_have_count(0)
     no_js.close()
-    checks.append("Contracts and text diagrams remain keyboard-readable and printable without JavaScript")
+    checks.append("All 61 listings remain directly readable and printable without JavaScript")
 
 
 def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
@@ -432,65 +454,82 @@ def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
     page.on("pageerror", lambda error: errors.append(str(error)))
     page.on("response", lambda response: failures.append(f"{response.status} {response.url}") if response.status >= 400 else None)
     article = base + "introduction-to-blockchain/magic-vault/"
+    fences = magic_vault_fences()
+    expected_text = [
+        source for info, source in fences
+        if re.search(r"^text(?:\s|$)|(?:^|[\s{])\.text(?:\s|}|$)", info)
+    ]
+    assert len(expected_text) == 27
     measurements = []
+
     for width in (320, 390):
         for theme in ("dark", "light"):
             page.set_viewport_size({"width": width, "height": 844})
             page.goto(article, wait_until="networkidle")
             page.evaluate("document.fonts.ready")
             page.locator(f".mobile-page-theme [data-set-theme='{theme}']").click()
-            expect(page.locator(".text-block")).to_have_count(27)
+            text_blocks = page.locator(".text-block")
+            expect(text_blocks).to_have_count(27)
             expect(page.locator(".text-block .code-toolbar")).to_have_count(0)
-            expect(page.locator(".text-block .code-disclosure:not([open])")).to_have_count(12)
-            initial = page.locator(".text-block").evaluate_all(r'''blocks => blocks.map((block, index) => {
+            expect(page.locator(".code-block details, .code-block summary, .code-disclosure")).to_have_count(0)
+            expect(page.locator(".code-block pre:visible")).to_have_count(61)
+            mobile_layout = text_blocks.evaluate_all(r'''blocks => blocks.map((block, index) => {
               const pre = block.querySelector('pre'), code = block.querySelector('code');
-              const details = block.querySelector('details'), copy = block.querySelector('.code-copy');
+              const copy = block.querySelector('.code-copy');
               const preBox = pre.getBoundingClientRect(), copyBox = copy.getBoundingClientRect();
-              return {index, lines: code.textContent.trim().split('\n').length,
-                height: block.getBoundingClientRect().height, closed: !!details && !details.open,
-                mode: block.dataset.wrap, overflow: pre.scrollWidth - pre.clientWidth,
+              return {index, ariaLabel: pre.getAttribute('aria-label'), mode: block.dataset.wrap,
+                height: block.getBoundingClientRect().height,
+                visible: pre.checkVisibility({contentVisibilityAuto: true}),
+                overflow: pre.scrollWidth - pre.clientWidth,
+                verticalOverflow: pre.scrollHeight - pre.clientHeight,
                 font: getComputedStyle(code).fontSize, lineHeight: getComputedStyle(code).lineHeight,
                 copyWidth: copyBox.width, copyHeight: copyBox.height,
-                controlsClear: details ? copyBox.left >= block.querySelector('summary').getBoundingClientRect().right - 56 : copyBox.left >= preBox.right,
-                hintHidden: block.querySelector('.code-scroll-hint').hidden};
+                controlsClear: copyBox.left >= preBox.right};
             })''')
-            for block in initial:
-                assert block["height"] <= 165, (width, block)
+            for block in mobile_layout:
+                assert block["visible"], (width, block)
                 assert block["font"] == "14px" and block["lineHeight"] == "20px", (width, block)
+                assert block["verticalOverflow"] <= 1, (width, block)
                 assert block["copyWidth"] >= 44 and block["copyHeight"] >= 44, (width, block)
                 assert block["controlsClear"], (width, block)
-                if block["lines"] > 6:
-                    assert block["closed"] and block["height"] <= 90, (width, block)
-                    assert block["hintHidden"], (width, block)
-                else:
-                    assert not block["closed"], (width, block)
-                if block["lines"] == 1:
-                    assert block["height"] <= 64, (width, block)
-                if block["mode"] == "flow" and not block["closed"]:
+                if block["mode"] == "flow":
                     assert block["overflow"] <= 1, (width, block)
-            measurements.append({"width": width, "theme": theme, "blocks": initial})
-            assert_no_horizontal_overflow(page)
-            short_result = page.locator('.text-block[data-wrap="flow"]').filter(has_text="right =")
-            if short_result.count():
-                short_result.first.scroll_into_view_if_needed()
-            page.screenshot(path=str(RESULTS / f"text-examples-{width}-{theme}.png"))
-            for index in range(27):
-                block = page.locator(".text-block").nth(index)
-                expected = block.locator("code").text_content().removesuffix("\n")
+
+            for index, expected in enumerate(expected_text):
+                block = text_blocks.nth(index)
+                assert block.locator("code").text_content().removesuffix("\n") == expected
                 block.get_by_role("button", name="Copy code", exact=True).tap()
-                page.wait_for_function("async expected => await navigator.clipboard.readText() === expected", arg=expected)
-                if block.locator("details").count():
-                    block.locator("summary").tap()
-                    expect(block.locator("pre")).to_be_visible()
-                    assert block.locator("pre").evaluate("pre => pre.scrollHeight <= pre.clientHeight + 1")
-                    if block.get_attribute("data-wrap") == "preserve":
-                        expect(block.locator("code")).to_have_css("white-space", "pre")
-                    block.locator("summary").tap()
+                page.wait_for_function(
+                    "async expected => await navigator.clipboard.readText() === expected", arg=expected
+                )
+
+            for aria_label, maximum_height, shifted, discarded, line_count in (
+                ("Right shift block", 145, "00 00 00 00 10 23 32 45", "54 67 76 89", 6),
+                ("Left shift block", 125, "32 45 54 67 76 89 00 00", "10 23", 5),
+            ):
+                pre = page.locator(f'pre[aria-label="{aria_label}"]')
+                expect(pre).to_have_count(1)
+                expect(pre).to_be_visible()
+                expect(pre.locator("code")).to_have_css("white-space", "pre")
+                assert pre.evaluate("element => element.scrollWidth <= element.clientWidth + 1")
+                block = next(item for item in mobile_layout if item["ariaLabel"] == aria_label)
+                assert block["height"] <= maximum_height, (width, aria_label, block)
+                lines = pre.locator("code").text_content().strip("\n").splitlines()
+                assert len(lines) == line_count, (aria_label, lines)
+                assert lines[1] == "10 23 32 45 54 67 76 89", (aria_label, lines)
+                assert lines[3] == shifted, (aria_label, lines)
+                assert lines[-1].endswith(": " + discarded), (aria_label, lines)
+
+            measurements.append({"width": width, "theme": theme, "blocks": mobile_layout})
+            assert_no_horizontal_overflow(page)
+            right_shift = page.locator('pre[aria-label="Right shift block"]')
+            right_shift.scroll_into_view_if_needed()
+            page.screenshot(path=str(RESULTS / f"text-examples-{width}-{theme}.png"))
             assert_no_horizontal_overflow(page)
     (RESULTS / "text-size-report.json").write_text(json.dumps(measurements, indent=2), encoding="utf-8")
     context.close()
-    checks.append("Actual mobile emulation keeps short text under 165px and all long examples under 90px until expanded")
-    checks.append("Every text example copies exactly and expands by touch without shrinking type or breaking aligned diagrams")
+    checks.append("All mobile text listings are fully visible, copy exactly, and retain 14px/20px source typography")
+    checks.append("Right and Left shift listings fit 320px and 390px phones without internal or page overflow")
 
 
 def main():

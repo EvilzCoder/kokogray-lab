@@ -3,10 +3,9 @@
 }
 
 .text-block { grid-template-columns: minmax(0, 1fr); }
-.text-block .code-disclosure > summary { padding-right: 16px; }
 
 @media screen {
-  .code-block[data-wrap="preserve"]:not(:has(.code-disclosure:not([open]))) .code-scroll-hint[hidden] {
+  .code-block[data-wrap="preserve"] .code-scroll-hint[hidden] {
     display: block !important;
   }
 }

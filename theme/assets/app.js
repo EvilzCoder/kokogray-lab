@@ -159,7 +159,7 @@
   codeBlocks.forEach(block => {
     const actions = $(".code-actions", block);
     const pre = $("pre", block);
-    if (block.dataset.wrap !== "preserve") {
+    if (!block.classList.contains("text-block") && block.dataset.wrap !== "preserve") {
       const wrap = document.createElement("button");
       wrap.type = "button";
       wrap.className = "code-wrap";

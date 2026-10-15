@@ -175,28 +175,37 @@ class CodeBlockFormatterTests(unittest.TestCase):
         wrap: str,
         filename: str | None = None,
         collapsed: bool = False,
+        title: str | None = None,
     ) -> None:
         self.assertTrue(has_class(block, "code-block"))
         self.assertEqual(block.attributes.get("data-language"), language)
         self.assertEqual(block.attributes.get("data-wrap"), wrap)
 
-        toolbar = only(descendants(block, class_name="code-toolbar"), "code toolbar")
-        label = only(descendants(toolbar, class_name="code-label"), "code label")
-        actions = only(descendants(toolbar, class_name="code-actions"), "code actions")
+        plain_text = language in {"text", "txt", "plaintext"}
+        self.assertEqual(has_class(block, "text-block"), plain_text)
+        if plain_text:
+            self.assertEqual(descendants(block, class_name="code-toolbar"), [])
+            self.assertEqual(descendants(block, class_name="code-language"), [])
+            label_text = "Text"
+        else:
+            toolbar = only(descendants(block, class_name="code-toolbar"), "code toolbar")
+            label = only(descendants(toolbar, class_name="code-label"), "code label")
+            label_text = text_content(only(descendants(label, class_name="code-language"), "language label"))
+        actions = only(descendants(block, class_name="code-actions"), "code actions")
         self.assertEqual(text_content(actions), "")
         self.assertEqual(descendants(actions), [])
 
-        filenames = descendants(label, class_name="code-filename")
+        filenames = descendants(block, class_name="code-filename")
         if filename is None:
             self.assertEqual(filenames, [])
         else:
             self.assertEqual(len(filenames), 1)
             self.assertEqual(text_content(filenames[0]), filename)
-        self.assertEqual(len(descendants(label, class_name="code-language")), 1)
         hint = only(descendants(block, class_name="code-scroll-hint"), "scroll hint")
         self.assertIn("hidden", hint.attributes)
         self.assertEqual(hint.attributes.get("aria-hidden"), "true")
-        self.assertEqual(descendants(toolbar, class_name="code-scroll-hint"), [hint] if wrap == "preserve" else [])
+        if not plain_text:
+            self.assertEqual(descendants(toolbar, class_name="code-scroll-hint"), [hint] if wrap == "preserve" else [])
 
         details = descendants(block, tag="details", class_name="code-disclosure")
         self.assertEqual(len(details), int(collapsed))
@@ -214,8 +223,8 @@ class CodeBlockFormatterTests(unittest.TestCase):
         self.assertEqual(pre.attributes.get("tabindex"), "0")
         self.assertEqual(
             pre.attributes.get("aria-label"),
-            f"{filename or text_content(only(descendants(label, class_name='code-language'), 'language label'))} "
-            f"{'block' if wrap == 'preserve' else 'source code'}",
+            f"{title or filename or label_text} "
+            f"{'block' if plain_text or wrap == 'preserve' else 'source code'}",
         )
         code = only(descendants(pre, tag="code"), "code element")
         self.assertTrue(has_class(code, f"language-{language}"))
@@ -282,7 +291,7 @@ class CodeBlockFormatterTests(unittest.TestCase):
         )
         self.assertEqual(text_content(only(descendants(block, tag="code"), "code element")).count("unlock"), 1)
 
-    def test_preserved_text_disclosure_keeps_compact_hint_and_complete_source(self):
+    def test_preserved_text_disclosure_keeps_complete_source_without_a_toolbar(self):
         source = "left  = 00 01\nright = 10 11\n        -----\nresult: 10 11"
         rendered = render_markdown(f'```{{.text collapse="true"}}\n{source}\n```')
         block = only(descendants(Document(rendered).root, class_name="code-block"), "text block")
@@ -290,6 +299,30 @@ class CodeBlockFormatterTests(unittest.TestCase):
         summary = only(descendants(block, tag="summary"), "text disclosure summary")
         self.assertIn("Show full text", text_content(summary))
         self.assertIn("Hide full text", text_content(summary))
+
+    def test_flow_layout_is_opt_in_and_only_applies_to_plain_text(self):
+        source = "value = 00 01 02 03\n\nresult = 10 11 12 13"
+        for language in ("text", "txt", "plaintext", "console", "solidity"):
+            with self.subTest(language=language):
+                rendered = render_markdown(f'```{{.{language} layout="flow"}}\n{source}\n```')
+                block = only(descendants(Document(rendered).root, class_name="code-block"), "code block")
+                expected = "auto" if language == "solidity" else "preserve" if language == "console" else "flow"
+                self.assert_block(block, language=language, source=source, wrap=expected)
+        rendered = render_markdown(f'```{{.text layout="unknown"}}\n{source}\n```')
+        block = only(descendants(Document(rendered).root, class_name="code-block"), "text block")
+        self.assert_block(block, language="text", source=source, wrap="preserve")
+
+    def test_text_titles_are_escaped_and_never_enter_the_copyable_source(self):
+        title = '<img src=x onerror="alert(1)">'
+        source = "left  = 00 01\nright = 10 11"
+        rendered = highlight(source, TextLexer(), CodeBlockFormatter("language-text", collapse=True, title=title))
+        document = Document(rendered)
+        block = only(descendants(document.root, class_name="code-block"), "text block")
+        self.assert_block(block, language="text", source=source, wrap="preserve", collapsed=True, title=title)
+        summary = only(descendants(block, tag="summary"), "disclosure summary")
+        self.assertIn(title, text_content(summary))
+        self.assertNotIn("img", document.tags)
+        self.assertNotIn("<img", rendered)
 
     def test_unspecified_and_false_collapse_attributes_do_not_create_disclosures(self):
         rendered = render_markdown(
@@ -413,18 +446,20 @@ class MagicVaultCodeBlockBuildTests(unittest.TestCase):
                 self.assertEqual(block.attributes.get("data-language"), fence.language)
                 self.assertEqual(
                     block.attributes.get("data-wrap"),
-                    "auto" if fence.language == "solidity" else "preserve",
+                    "auto" if fence.language == "solidity" else "flow" if fence.attribute("layout") == "flow" else "preserve",
                 )
-                toolbar = only(descendants(block, class_name="code-toolbar"), "code toolbar")
-                self.assertEqual(len(descendants(toolbar, class_name="code-label")), 1)
-                actions = only(descendants(toolbar, class_name="code-actions"), "code actions")
+                if fence.language == "text":
+                    self.assertTrue(has_class(block, "text-block"))
+                    self.assertEqual(descendants(block, class_name="code-toolbar"), [])
+                else:
+                    toolbar = only(descendants(block, class_name="code-toolbar"), "code toolbar")
+                    self.assertEqual(len(descendants(toolbar, class_name="code-label")), 1)
+                actions = only(descendants(block, class_name="code-actions"), "code actions")
                 self.assertEqual(text_content(actions), "")
                 self.assertEqual(descendants(actions), [])
                 hint = only(descendants(block, class_name="code-scroll-hint"), "scroll hint")
-                self.assertEqual(
-                    descendants(toolbar, class_name="code-scroll-hint"),
-                    [] if fence.language == "solidity" else [hint],
-                )
+                if fence.language != "text":
+                    self.assertEqual(descendants(toolbar, class_name="code-scroll-hint"), [hint] if fence.language == "console" else [])
 
                 pre = only(descendants(block, tag="pre"), "code pre")
                 self.assertEqual(pre.attributes.get("role"), "group")
@@ -444,31 +479,25 @@ class MagicVaultCodeBlockBuildTests(unittest.TestCase):
             body_without_front_matter(self.markdown),
         )
 
-    def test_full_contracts_and_only_the_two_longest_text_blocks_are_collapsed(self):
+    def test_full_contracts_and_long_text_examples_have_named_disclosures(self):
         filenames = [
             text_content(filename)
             for filename in descendants(self.document.root, class_name="code-filename")
         ]
         self.assertEqual(filenames, ["Setup.sol", "Vault.sol", "Solver.sol"])
 
-        explicit_collapse = [
-            (fence.language, fence.attribute("filename"), fence.attribute("collapse"))
-            for fence in self.fences
-            if fence.attribute("collapse") is not None
-        ]
-        self.assertEqual(explicit_collapse, [
-            ("solidity", "Vault.sol", "true"),
-            ("text", None, "true"),
-            ("text", None, "true"),
-            ("solidity", "Solver.sol", "true"),
-        ])
         text_fences = [fence for fence in self.fences if fence.language == "text"]
-        longest = sorted(text_fences, key=lambda fence: len(fence.source.strip("\n").splitlines()), reverse=True)[:2]
-        self.assertEqual({len(fence.source.strip("\n").splitlines()) for fence in longest}, {26, 37})
-        self.assertEqual([fence for fence in text_fences if fence.attribute("collapse") == "true"], longest[::-1])
+        long_examples = [fence for fence in text_fences if len(fence.source.strip("\n").splitlines()) > 6]
+        self.assertEqual(len(long_examples), 12)
+        self.assertEqual([fence for fence in text_fences if fence.attribute("collapse") == "true"], long_examples)
+        self.assertTrue(all(fence.attribute("title") for fence in long_examples))
+        for fence, block in zip(self.fences, self.blocks, strict=True):
+            if fence in long_examples:
+                summary = only(descendants(block, tag="summary"), "text example summary")
+                self.assertIn(fence.attribute("title"), text_content(summary))
 
         details = descendants(self.document.root, tag="details", class_name="code-disclosure")
-        self.assertEqual(len(details), 4)
+        self.assertEqual(len(details), 14)
         self.assertTrue(all("open" not in disclosure.attributes for disclosure in details))
         for block in self.blocks:
             if block.attributes.get("data-language") != "text":
@@ -494,6 +523,14 @@ class MagicVaultCodeBlockBuildTests(unittest.TestCase):
                 self.assertIn("Show full contract", text_content(summary))
                 self.assertIn("Hide full contract", text_content(summary))
                 self.assertEqual(len(descendants(disclosure, class_name="code-body")), 1)
+
+    def test_only_independent_text_explanations_wrap(self):
+        text_fences = [fence for fence in self.fences if fence.language == "text"]
+        flow_indices = [index for index, fence in enumerate(text_fences) if fence.attribute("layout") == "flow"]
+        self.assertEqual(flow_indices, [0, 1, 6, 8, 17, 18, 21, 23, 26])
+        for fence in text_fences:
+            if any(marker in fence.source for marker in ("[", "│", "─", "---")):
+                self.assertIsNone(fence.attribute("layout"), "Byte columns and ASCII diagrams must preserve alignment")
 
     def test_solidity_syntax_classes_and_fence_attributes_do_not_leak_into_html(self):
         for css_class in ("kt", "nv", "ni"):

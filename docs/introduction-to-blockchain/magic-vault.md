@@ -297,7 +297,7 @@ _key1 က _generateKey function ကို အသုံးပြုပါတယ�
 
 _key2 ကလည်း _generateKey ကို အသုံးပြုပါတယ်။ _reductor ရဲ့ တန်ဖိုးကို အမြဲ 2 အဖြစ် ထားပါတယ်။ ပြီးတော့ ရလာတဲ့ တန်ဖိုး ကို uint128 ပြောင်းပါတယ်။ သို့သော် _generateKey function ရဲ့ တန်ဖိုးက uint256 ဖြစ်တဲ့ အတွက် uint128 အဖြစ် cast လုပ်တဲ့အခါ 256-bit ထဲကနေ အရှေ့ဆုံး 128-bit ကို truncate လုပ်လိုက်ပါတယ်။
 
-```text
+```{.text layout="flow"}
 y = x mod 2^{128}
 
 y = x ကို 2^{128} နဲ့ စားလို့ ရမဲ့ အကြွင်း
@@ -309,7 +309,7 @@ _secret ကို တွက်ထုတ်ဖို့ ပထမ bytes32 passphr
 
 ![alt text](image-1.png)
 
-```text
+```{.text layout="flow"}
  XOR ရဲ့ သဘောတရား က
 
 နေရာတူ bit ၂ ခု မတူရင် 1 ဖြစ်ပြီး
@@ -320,7 +320,7 @@ _secret ကို တွက်ထုတ်ဖို့ ပထမ bytes32 passphr
 
 ထို့နောက် ရလာတဲ့ uint256 value ကို bytes32 အဖြစ် ပြောင်းပါတယ်။ bytes32 တန်ဖိုးကို bytes16 အဖြစ် cast လုပ်လိုက်တဲ့အခါ အရှေ့ဆုံး 16 bytes ကို ယူပြီး အနောက်ဆုံး 16 bytes ကို ဖြတ်ချပါတယ်။ [00] နဲ့ အစားထိုးတာ မဟုတ်ပါဘူး။
 
-```text
+```{.text collapse="true" title="Bytes32 to bytes16"}
 ဥပမာ passphrase နဲ့ _key1 ကို XOR လုပ်ပြီး ရလာတဲ့ bytes32 က
 
 0x11223344556677889900aabbccddeeffffeeddccbbaa00998877665544332211
@@ -372,7 +372,7 @@ return (_secret >> 32 | _secret << 16);
 
 ရလာတဲ့ bytes8 _secret တန်ဖိုးကို ညာဘက် 32-bit ရွှေ့ထားတဲ့ ရလဒ်တခုနဲ့ ဘယ်ဘက် 16-bit ရွှေ့ထားတဲ့ ရလဒ်တခု သီးသန့်တွက်ပါတယ်။ ညာဘက်ရွှေ့ပြီးသားကို ဆက်ပြီး ဘယ်ဘက်ရွှေ့တာ မဟုတ်ပါဘူး။ ရလဒ်နှစ်ခုကို | operator နဲ့ OR ပါမယ်။
 
-```text
+```{.text collapse="true" title="Right shift"}
 Example
 
 မူလ:
@@ -383,12 +383,12 @@ Example
                                           ဘောင်အပြင်ရောက်လို့ ပျောက်
 
 ```
-```text
+```{.text layout="flow"}
 ရလဒ် : right == 0x0000000010233245;
 
 ```
 
-```text
+```{.text collapse="true" title="Left shift"}
 Example
 
 မူလ:
@@ -398,13 +398,13 @@ Example
 [10] [23]  ←  [32] [45] [54] [67] [76] [89] [00] [00]
 ပျောက်
 ```
-```text
+```{.text layout="flow"}
 ရလဒ် : left == 0x3245546776890000;
 ```
 
 ရလာတဲ့ left နဲ့ right value တွေကို OR မယ် ဆိုရင် အဖြေက ဒီလိုရပါတယ်။ bitwise OR ရဲ့ သဘောတရားက နေရာတူ bit နှစ်ခုကို နှိုင်းယှဉ်ပြီး တစ်ခုခုက 1 ဖြစ်ရင် 1 ထုတ်ပေးတယ်။
 
-```{.text collapse="true"}
+```{.text collapse="true" title="Bitwise OR"}
 right = 00 00 00 00 10 23 32 45
 left  = 32 45 54 67 76 89 00 00
         -----------------------
@@ -435,7 +435,7 @@ OR   = 1010 1011 = 0xAB
 
 ### Architecture overview
 
-```{.text collapse="true"}
+```{.text collapse="true" title="Architecture"}
              Setup ကို deploy လုပ်သူ
                        │
                        │ 1 ETH နဲ့ deploy
@@ -510,7 +510,7 @@ bytes16 : 0x3245546776ab32450000000000000000
 
 ပြီးတော့ >> 64 ဆိုပြီး ညာဘက်ကို 64-bit ရွှေ့ပါတယ်။ 8-bit က 1 byte ဖြစ်တဲ့အတွက် 64-bit ဆိုရင် 8 bytes ဖြစ်ပါတယ်။
 
-```text
+```{.text collapse="true" title="64-bit shift"}
 မူလ:
 [32][45][54][67][76][ab][32][45][00][00][00][00][00][00][00][00]
 
@@ -567,7 +567,7 @@ require(uint64(_input) == _secretKey, "Case 2 failed");
 
 uint128 ကနေ uint64 အဖြစ် ပြောင်းလိုက်တဲ့အချိန်မှာ အရှေ့ပိုင်း 64-bit ကို ဖြတ်ချပြီး အနောက်ဆုံး 64-bit ကိုပဲ ယူပါတယ်။
 
-```text
+```{.text collapse="true" title="Input byte layout"}
 _input : 0x11223344556677883245546776ab3245
 
 အရှေ့ပိုင်း                အနောက်ပိုင်း
@@ -608,7 +608,7 @@ uint64(bytes8(_password)) : 0x1122334455667788
 
 ညာဘက်က uint64(uint160(owner)) ကိုလည်း ကြည့်ပါမယ်။ owner က address type ဖြစ်တဲ့အတွက် 20 bytes ၊ တနည်းအားဖြင့် 160-bit ရှိပါတယ်။ uint160 ပြောင်းလိုက်တော့ အဲ့ address ကို integer အဖြစ် ယူလိုက်တာပါ။ ပြီးမှ uint64 ပြောင်းတဲ့အတွက် အနောက်ဆုံး 8 bytes ပဲ ကျန်ပါမယ်။
 
-```text
+```{.text layout="flow"}
 ဥပမာ owner address က
 
 0xaabbccddeeff0011223344551122334455667788
@@ -618,7 +618,7 @@ uint64(uint160(owner)) : 0x1122334455667788
 
 ဒီမှာ owner က ဘယ်သူလဲ ဆိုတာ ပြန်ကြည့်ပါမယ်။ အပေါ်က constructor() မှာ ရှင်းထားတဲ့အတိုင်း Vault ကို new Vault() နဲ့ ဖန်တီးတာက Setup Contract ဖြစ်လို့ owner က Setup Contract ရဲ့ address ဖြစ်ပါတယ်။ Vault ရဲ့ address ကိုယ်တိုင် မဟုတ်ပါဘူး။
 
-```text
+```{.text layout="flow" collapse="true" title="Constructor values"}
 Vault constructor() ထဲမှာ
 
 msg.sender    = Setup Contract address
@@ -634,7 +634,7 @@ map.holder    = Vault Contract address
 
 condition သုံးခုကို ပြန်ပေါင်းကြည့်လိုက်ရင် ကျွန်တော်တို့ ထည့်ပေးရမဲ့ password ပုံစံက ဒီလိုဖြစ်ပါတယ်။
 
-```text
+```{.text collapse="true" title="Password layout"}
                   bytes16 _password
 
 [ owner ရဲ့ နောက်ဆုံး 8 bytes ][ _secretKey 8 bytes ]
@@ -683,7 +683,7 @@ uint128 _key2 = uint128(_generateKey(2));
 
 _key1 တွက်တဲ့နေရာမှာလည်း အစီအစဉ်ကို သတိထားရပါမယ်။ _generateKey() ရဲ့ return တန်ဖိုးကို % 2 + 1 လုပ်တာ မဟုတ်ဘဲ block.timestamp % 2 + 1 ကို အရင်တွက်ပြီး ရလာတဲ့ 1 သို့မဟုတ် 2 ကို _reductor အဖြစ် ထည့်ပေးတာဖြစ်ပါတယ်။
 
-```text
+```{.text layout="flow"}
 block.timestamp က စုံကိန်းဆိုရင်
 _reductor = 0 + 1 = 1
 
@@ -710,7 +710,7 @@ bytes8 magicPassword = (secret >> 32) | (secret << 16);
 
 ဒါကြောင့် helper contract တခုထဲမှာ key ကို တွက်ပြီး အဲ့ transaction တခုတည်းအတွင်းမှာပဲ Vault ရဲ့ unlock() ကို ဆက်ခေါ်ပေးတဲ့နည်းကို သုံးပါမယ်။ ဒီလိုဆို helper contract နဲ့ Vault နှစ်ခုလုံးက block.number ၊ block.timestamp နဲ့ အရင် block တွေရဲ့ blockhash တွေကို တူတူပဲ မြင်ရမှာပါ။ nonce ကိုတော့ Vault ဆီက ဖတ်ပြီး helper ဘက်မှာ local variable နဲ့ တွက်ရမှာဖြစ်ပါတယ်။
 
-```text
+```{.text collapse="true" title="Helper call flow"}
 Wallet က helper contract ကို ခေါ်မယ်
                   │
                   ▼
@@ -901,7 +901,7 @@ nonce = nonce + 1;
 
 Vault က _generateKey() တခါခေါ်ပြီးတိုင်း nonce ကို 1 တိုးတာကြောင့် Solver ဘက်မှာလည်း key1 တွက်ပြီးတာနဲ့ local nonce ကို 1 တိုးပေးရပါတယ်။ ဒါမှ key2 တွက်တဲ့နေရာမှာ သုံးတဲ့ nonce က Vault နဲ့ တူမှာဖြစ်ပါတယ်။
 
-```text
+```{.text layout="flow" collapse="true" title="Nonce calculation"}
 Vault ဆီက ဖတ်လာတဲ့ nonce = n
 
 Solver တွက်တဲ့အချိန်
@@ -977,7 +977,7 @@ password ရပြီဆိုတာနဲ့ Vault ရဲ့ unlock() ကို
 
 unlock() အောင်မြင်ရင် isUnlocked က true ဖြစ်သွားပြီး နောက်တကြောင်းက claimContent() ကို ဆက်ခေါ်ပါတယ်။ ဒီ call နှစ်ခုလုံးမှာ Vault က မြင်တဲ့ msg.sender က Solver Contract ရဲ့ address ဖြစ်ပါတယ်။ Wallet က solve() ကို စခေါ်ခဲ့ပေမဲ့ Vault ကို တိုက်ရိုက်ခေါ်တာက Solver ဖြစ်နေလို့ပါ။
 
-```text
+```{.text collapse="true" title="Contract call flow"}
 Wallet
   │
   └── Solver.solve(Vault address)
@@ -995,7 +995,7 @@ Wallet
 
 transaction အောင်မြင်ပြီးတဲ့အခါ မျှော်လင့်ရတဲ့ အခြေအနေက ဒီလိုဖြစ်ပါတယ်။ ဒါက တကယ့် RPC output မဟုတ်ဘဲ စစ်ကြည့်ရမဲ့ တန်ဖိုးတွေကို ဖော်ပြထားတာပါ။
 
-```text
+```{.text layout="flow"}
 Vault.isUnlocked() → true
 Vault.mapHolder()  → Solver Contract address
 Vault.nonce()      → solve() စခေါ်ချိန်က nonce + 2

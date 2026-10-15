@@ -224,13 +224,13 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
             expect(page.locator('.code-block[data-language="solidity"]')).to_have_count(33)
             expect(page.locator('.code-block[data-language="console"]')).to_have_count(1)
             expect(page.locator('.code-block[data-language="text"]')).to_have_count(27)
-            expect(page.locator(".code-disclosure:not([open])")).to_have_count(4)
-            text_blocks = page.locator('.code-block[data-language="text"]').filter(has=page.locator('.code-disclosure'))
-            expect(text_blocks).to_have_count(2)
-            for index in range(2):
+            expect(page.locator(".code-disclosure:not([open])")).to_have_count(14)
+            text_blocks = page.locator('.text-block').filter(has=page.locator('.code-disclosure'))
+            expect(text_blocks).to_have_count(12)
+            for index in range(12):
                 block = text_blocks.nth(index)
                 disclosure = block.locator('.code-disclosure')
-                assert block.bounding_box()["height"] < 100
+                assert block.bounding_box()["height"] <= 90
                 expect(disclosure.locator(".code-show")).to_have_text("Show full text")
                 expect(block.locator(".code-scroll-hint")).not_to_be_visible()
                 expect(block.locator("pre")).to_have_attribute("tabindex", "-1")
@@ -269,11 +269,14 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
               const code = block.querySelector('code');
               return {
                 language: block.dataset.language,
-                toolbarBottom: toolbar.getBoundingClientRect().bottom,
-                toolbarHeight: toolbar.getBoundingClientRect().height,
-                hintInToolbar: toolbar.contains(block.querySelector('.code-scroll-hint')),
+                mode: block.dataset.wrap,
+                toolbarBottom: toolbar?.getBoundingClientRect().bottom,
+                toolbarHeight: toolbar?.getBoundingClientRect().height,
+                hintInToolbar: toolbar?.contains(block.querySelector('.code-scroll-hint')),
                 copyBottom: copy.getBoundingClientRect().bottom,
+                copyLeft: copy.getBoundingClientRect().left,
                 preTop: pre.getBoundingClientRect().top,
+                preRight: pre.getBoundingClientRect().right,
                 overflow: pre.scrollWidth - pre.clientWidth,
                 verticalOverflow: pre.scrollHeight - pre.clientHeight,
                 font: getComputedStyle(code).fontSize,
@@ -286,8 +289,11 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
               };
             })""")
             for block in layout:
-                assert block["copyBottom"] <= block["preTop"] + .1, block
-                assert block["toolbarBottom"] <= block["preTop"] + .1, block
+                assert block["copyBottom"] <= block["preTop"] + .1 or block["copyLeft"] >= block["preRight"] - .1, block
+                if block["language"] == "text":
+                    assert block.get("toolbarBottom") is None, block
+                else:
+                    assert block["toolbarBottom"] <= block["preTop"] + .1, block
                 assert block["font"] == "14px", block
                 assert block["verticalOverflow"] <= 1, block
                 assert block["role"] == "group", block
@@ -298,6 +304,12 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
                     if width < 640:
                         assert block["overflow"] <= 1, block
                         assert block["copyHeight"] >= 44, block
+                elif block["language"] == "text":
+                    assert block["wrap"] is None, block
+                    assert block["whiteSpace"] == ("pre-wrap" if block["mode"] == "flow" else "pre"), block
+                    assert block["copyHeight"] >= 44, block
+                    if block["mode"] == "flow":
+                        assert block["overflow"] <= 1, block
                 else:
                     assert block["wrap"] is None and block["whiteSpace"] == "pre", block
                     assert block["hintInToolbar"], block
@@ -348,7 +360,7 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
     checks.append("Magic Vault toolbars, exact full-contract copy, and keyboard disclosures in both themes")
     checks.append("Phone source wrapping, 44px controls, contained unwrapped diagrams, and no code overlays")
     checks.append("All rendered Solidity token categories meet 4.5:1 contrast in light and dark themes")
-    checks.append("Compact text toolbars and two expandable diagrams preserve full text and keyboard copying")
+    checks.append("Compact text examples and twelve named disclosures preserve full text and keyboard copying")
 
     page.set_viewport_size({"width": 390, "height": 844})
     page.goto(article, wait_until="networkidle")
@@ -362,15 +374,15 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
     checks.append("Responsive wrap defaults track viewport changes and preserve explicit block choices")
 
     page.evaluate("window.dispatchEvent(new Event('beforeprint'))")
-    expect(page.locator(".code-disclosure[open]")).to_have_count(4)
+    expect(page.locator(".code-disclosure[open]")).to_have_count(14)
     page.emulate_media(media="print")
-    for index in range(4):
+    for index in range(14):
         expect(page.locator(".code-disclosure pre").nth(index)).to_be_visible()
     expect(page.locator(".code-copy:visible")).to_have_count(0)
     expect(page.locator(".code-scroll-hint:visible")).to_have_count(0)
     page.emulate_media(media="screen")
     page.evaluate("window.dispatchEvent(new Event('afterprint'))")
-    expect(page.locator(".code-disclosure:not([open])")).to_have_count(4)
+    expect(page.locator(".code-disclosure:not([open])")).to_have_count(14)
     checks.append("Printing expands full contracts and text diagrams, then restores disclosure states")
     context.close()
 
@@ -379,31 +391,106 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
     for width in (320, 390):
         static_page.set_viewport_size({"width": width, "height": 844})
         static_page.goto(article, wait_until="networkidle")
-        expect(static_page.locator(".code-toolbar")).to_have_count(61)
+        expect(static_page.locator(".code-toolbar")).to_have_count(34)
+        expect(static_page.locator(".text-block .code-toolbar")).to_have_count(0)
         expect(static_page.locator(".code-actions button")).to_have_count(0)
-        expect(static_page.locator('.code-block[data-wrap="preserve"] .code-scroll-hint:visible')).to_have_count(26)
+        preserved = static_page.locator('.code-block[data-wrap="preserve"]')
+        visible_preserved = preserved.filter(has_not=static_page.locator('.code-disclosure:not([open])')).count()
+        expect(preserved.locator('.code-scroll-hint:visible')).to_have_count(visible_preserved)
         expect(static_page.locator('.code-block pre[role="region"]')).to_have_count(0)
-        expect(static_page.locator(".code-disclosure:not([open])")).to_have_count(4)
+        expect(static_page.locator(".code-disclosure:not([open])")).to_have_count(14)
         expect(static_page.locator("[data-toggle-theme]")).not_to_be_visible()
-        for index in range(4):
+        for index in range(14):
             disclosure = static_page.locator(".code-disclosure").nth(index)
             disclosure.locator("summary").focus()
             disclosure.locator("summary").press("Enter")
             expect(disclosure.locator("pre")).to_be_visible()
-        expect(static_page.locator('.code-block[data-wrap="preserve"] .code-scroll-hint:visible')).to_have_count(28)
+        expect(preserved.locator('.code-scroll-hint:visible')).to_have_count(preserved.count())
+        expect(static_page.locator('.text-block[data-wrap="flow"] .code-scroll-hint:visible')).to_have_count(0)
         assert_no_horizontal_overflow(static_page)
         assert static_page.locator('.code-block[data-language="solidity"] pre').evaluate_all(
             "elements => elements.every(el => el.scrollWidth <= el.clientWidth + 1)"
         )
     static_page.goto(article, wait_until="networkidle")
     static_page.emulate_media(media="print")
-    for index in range(4):
+    for index in range(14):
         pre = static_page.locator(".code-disclosure pre").nth(index)
         expect(pre).to_be_visible()
         assert pre.evaluate("element => element.checkVisibility({contentVisibilityAuto: true})")
     expect(static_page.locator(".code-scroll-hint:visible")).to_have_count(0)
     no_js.close()
     checks.append("Contracts and text diagrams remain keyboard-readable and printable without JavaScript")
+
+
+def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
+    context = browser.new_context(
+        viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True,
+        device_scale_factor=3, reduced_motion="reduce",
+    )
+    context.grant_permissions(["clipboard-read", "clipboard-write"], origin=origin)
+    page = context.new_page()
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.on("response", lambda response: failures.append(f"{response.status} {response.url}") if response.status >= 400 else None)
+    article = base + "introduction-to-blockchain/magic-vault/"
+    measurements = []
+    for width in (320, 390):
+        for theme in ("dark", "light"):
+            page.set_viewport_size({"width": width, "height": 844})
+            page.goto(article, wait_until="networkidle")
+            page.evaluate("document.fonts.ready")
+            page.locator(f".mobile-page-theme [data-set-theme='{theme}']").click()
+            expect(page.locator(".text-block")).to_have_count(27)
+            expect(page.locator(".text-block .code-toolbar")).to_have_count(0)
+            expect(page.locator(".text-block .code-disclosure:not([open])")).to_have_count(12)
+            initial = page.locator(".text-block").evaluate_all(r'''blocks => blocks.map((block, index) => {
+              const pre = block.querySelector('pre'), code = block.querySelector('code');
+              const details = block.querySelector('details'), copy = block.querySelector('.code-copy');
+              const preBox = pre.getBoundingClientRect(), copyBox = copy.getBoundingClientRect();
+              return {index, lines: code.textContent.trim().split('\n').length,
+                height: block.getBoundingClientRect().height, closed: !!details && !details.open,
+                mode: block.dataset.wrap, overflow: pre.scrollWidth - pre.clientWidth,
+                font: getComputedStyle(code).fontSize, lineHeight: getComputedStyle(code).lineHeight,
+                copyWidth: copyBox.width, copyHeight: copyBox.height,
+                controlsClear: details ? copyBox.left >= block.querySelector('summary').getBoundingClientRect().right - 56 : copyBox.left >= preBox.right,
+                hintHidden: block.querySelector('.code-scroll-hint').hidden};
+            })''')
+            for block in initial:
+                assert block["height"] <= 165, (width, block)
+                assert block["font"] == "14px" and block["lineHeight"] == "20px", (width, block)
+                assert block["copyWidth"] >= 44 and block["copyHeight"] >= 44, (width, block)
+                assert block["controlsClear"], (width, block)
+                if block["lines"] > 6:
+                    assert block["closed"] and block["height"] <= 90, (width, block)
+                    assert block["hintHidden"], (width, block)
+                else:
+                    assert not block["closed"], (width, block)
+                if block["lines"] == 1:
+                    assert block["height"] <= 64, (width, block)
+                if block["mode"] == "flow" and not block["closed"]:
+                    assert block["overflow"] <= 1, (width, block)
+            measurements.append({"width": width, "theme": theme, "blocks": initial})
+            assert_no_horizontal_overflow(page)
+            short_result = page.locator('.text-block[data-wrap="flow"]').filter(has_text="right =")
+            if short_result.count():
+                short_result.first.scroll_into_view_if_needed()
+            page.screenshot(path=str(RESULTS / f"text-examples-{width}-{theme}.png"))
+            for index in range(27):
+                block = page.locator(".text-block").nth(index)
+                expected = block.locator("code").text_content().removesuffix("\n")
+                block.get_by_role("button", name="Copy code", exact=True).tap()
+                page.wait_for_function("async expected => await navigator.clipboard.readText() === expected", arg=expected)
+                if block.locator("details").count():
+                    block.locator("summary").tap()
+                    expect(block.locator("pre")).to_be_visible()
+                    assert block.locator("pre").evaluate("pre => pre.scrollHeight <= pre.clientHeight + 1")
+                    if block.get_attribute("data-wrap") == "preserve":
+                        expect(block.locator("code")).to_have_css("white-space", "pre")
+                    block.locator("summary").tap()
+            assert_no_horizontal_overflow(page)
+    (RESULTS / "text-size-report.json").write_text(json.dumps(measurements, indent=2), encoding="utf-8")
+    context.close()
+    checks.append("Actual mobile emulation keeps short text under 165px and all long examples under 90px until expanded")
+    checks.append("Every text example copies exactly and expands by touch without shrinking type or breaking aligned diagrams")
 
 
 def main():
@@ -548,6 +635,7 @@ def main():
             check_reference_theme(page, base, checks)
             check_top_theme_toggle(page, base, checks)
             check_code_blocks(browser, base, origin, checks, errors, failures)
+            check_mobile_text_examples(browser, base, origin, checks, errors, failures)
 
             page.goto(base + "404.html", wait_until="networkidle")
             expect(page.locator(".page-title")).to_have_text("Page not found")

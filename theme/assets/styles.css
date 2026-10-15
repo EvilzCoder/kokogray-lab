@@ -206,7 +206,19 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .code-block[data-wrap="on"] pre code { width: auto; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .code-scroll-hint { padding: 4px 16px 8px; color: var(--muted); font: 11px/16px var(--font); }
 .code-block[data-wrap="preserve"] .code-toolbar { min-height: 36px; padding: 0 12px; background: transparent; }
-.code-block[data-wrap="preserve"] .code-scroll-hint { padding: 0; }
+.code-block[data-wrap="preserve"] .code-toolbar .code-scroll-hint { padding: 0; }
+.text-block { display: grid; grid-template-columns: minmax(0, 1fr) 44px; }
+.text-block > .code-actions { grid-column: 2; grid-row: 1; align-self: start; z-index: 1; }
+.text-block .code-copy { width: 44px; min-height: 44px; padding: 0; }
+.text-block .code-copy:focus-visible { outline-offset: -3px; }
+.text-block > pre { grid-column: 1; grid-row: 1; min-width: 0; min-height: 44px; }
+.text-block > .code-disclosure { grid-column: 1 / -1; grid-row: 1; min-width: 0; }
+.text-block .code-disclosure > summary { padding-right: 56px; }
+.text-block > .text-caption { grid-column: 1; grid-row: 1; padding: 12px 16px; color: var(--muted); font: 12px/20px var(--font); overflow-wrap: anywhere; }
+.text-block:has(.text-caption) > pre, .text-block:has(.text-caption) > .code-disclosure { grid-column: 1 / -1; grid-row: 2; }
+.text-block:has(.text-caption) .code-disclosure > summary { padding-right: 16px; }
+.text-block > .code-scroll-hint { grid-column: 1 / -1; padding: 0 16px 6px; }
+.text-block[data-wrap="flow"] pre code { width: auto; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .codehilite .c, .codehilite .ch, .codehilite .c1, .codehilite .cm, .codehilite .cp, .codehilite .cpf, .codehilite .cs { color: var(--muted); }
 .codehilite .k, .codehilite .kn, .codehilite .kd, .codehilite .kc, .codehilite .kp, .codehilite .kr, .codehilite .ow { color: var(--syntax-keyword); }
 .codehilite .kt { color: var(--syntax-type); }
@@ -386,6 +398,7 @@ body:has(.search-dialog[open]) { overflow: hidden; }
   .code-disclosure::details-content { content-visibility: visible; }
   .code-disclosure > .code-body { display: block !important; }
   .codehilite, .codehilite pre { overflow: visible; }
+  .text-block { display: block; }
   .page-content h2, .page-content h3 { break-after: avoid; }
   .admonition, .table-scroll { break-inside: avoid; }
 }

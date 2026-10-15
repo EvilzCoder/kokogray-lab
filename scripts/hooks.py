@@ -20,6 +20,9 @@ class CodeBlockFormatter(HtmlFormatter):
         self.code_filename = self.filename
         self.filename = ""
         self.collapsible = str(options.get("collapse", "false")).lower() == "true"
+        self.plain_text = self.language in {"text", "txt", "plaintext"}
+        self.flow_text = self.plain_text and options.get("layout") == "flow"
+        self.text_title = str(options.get("title", "")) if self.plain_text else ""
         self.preserve_lines = self.language in {
             "text", "txt", "plaintext", "console", "shell-session", "pycon",
         }
@@ -37,20 +40,26 @@ class CodeBlockFormatter(HtmlFormatter):
         language = escape(self.language, quote=True)
         label = escape(self.language_label)
         kind = "block" if self.preserve_lines else "source code"
-        region = escape(f"{self.code_filename or self.language_label} {kind}", quote=True)
-        yield 0, '<div class="code-toolbar"><div class="code-label">'
-        if filename:
-            yield 0, f'<span class="code-filename">{filename}</span>'
-        yield 0, f'<span class="code-language">{label}</span>'
-        if self.preserve_lines:
-            yield 0, '<span class="code-scroll-hint" hidden aria-hidden="true">Scroll horizontally &rarr;</span>'
-        yield 0, '</div><div class="code-actions"></div></div>'
+        region = escape(f"{self.text_title or self.code_filename or self.language_label} {kind}", quote=True)
+        if self.plain_text:
+            if filename:
+                yield 0, f'<div class="text-caption"><span class="code-filename">{filename}</span></div>'
+            yield 0, '<div class="code-actions"></div>'
+        else:
+            yield 0, '<div class="code-toolbar"><div class="code-label">'
+            if filename:
+                yield 0, f'<span class="code-filename">{filename}</span>'
+            yield 0, f'<span class="code-language">{label}</span>'
+            if self.preserve_lines:
+                yield 0, '<span class="code-scroll-hint" hidden aria-hidden="true">Scroll horizontally &rarr;</span>'
+            yield 0, '</div><div class="code-actions"></div></div>'
         if self.collapsible:
             noun = "contract" if self.language == "solidity" else "text" if self.preserve_lines else "code"
+            title = f': {escape(self.text_title)}' if self.text_title else ""
             yield 0, (
                 '<details class="code-disclosure"><summary>'
                 f'<span class="code-show">Show full {noun}</span>'
-                f'<span class="code-hide">Hide full {noun}</span>'
+                f'<span class="code-hide">Hide full {noun}</span>{title}'
                 '</summary><div class="code-body">'
             )
         yield 0, f'<pre tabindex="0" role="group" aria-label="{region}"><code class="language-{language}">'
@@ -58,13 +67,13 @@ class CodeBlockFormatter(HtmlFormatter):
         yield 0, '</code></pre>'
         if self.collapsible:
             yield 0, '</div></details>'
-        if not self.preserve_lines:
+        if self.plain_text or not self.preserve_lines:
             yield 0, '<div class="code-scroll-hint" hidden aria-hidden="true">Scroll horizontally to read &rarr;</div>'
 
     def _wrap_div(self, inner):
-        classes = escape(f"{self.cssclass} code-block", quote=True)
+        classes = escape(f"{self.cssclass} code-block{' text-block' if self.plain_text else ''}", quote=True)
         language = escape(self.language, quote=True)
-        wrap = "preserve" if self.preserve_lines else "auto"
+        wrap = "flow" if self.flow_text else "preserve" if self.preserve_lines else "auto"
         yield 0, f'<div class="{classes}" data-language="{language}" data-wrap="{wrap}">'
         yield from inner
         yield 0, '</div>\n'

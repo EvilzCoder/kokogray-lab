@@ -86,7 +86,17 @@ contract Vault {
 
 Omit `collapse="true"` for short snippets. Disclosures are native HTML and can be opened without JavaScript. Keep the full source in the fence: Copy includes it even when its disclosure is closed. Format long expressions across lines and dedent standalone snippets without changing their behavior.
 
-Source code wraps by default on phones; the toolbar's **Wrap** toggle can preserve source lines or enable wrapping on desktop. Wrapping is visual only and never changes copied text. `text` and `console` blocks retain their alignment and scroll horizontally, with a scroll hint inside their compact toolbar when needed. Use `{.text collapse="true"}` for unusually long diagrams; short explanations should stay open. Copy and Wrap live above the code rather than covering its first line. Line-number options are intentionally disabled so every copyable block keeps a single clean source container.
+Source code wraps by default on phones; the toolbar's **Wrap** toggle can preserve source lines or enable wrapping on desktop. Wrapping is visual only and never changes copied text. Source and terminal blocks keep their toolbars; plain `text` examples use a compact layout with a separate 44px Copy target instead of a full language toolbar. Controls never cover the source. Line-number options are intentionally disabled so every copyable block keeps a single clean source container.
+
+Plain text preserves columns by default for ASCII diagrams and byte layouts. Use `{.text layout="flow"}` for independent equations, prose, or results that can safely wrap to the reading width. Do not use it for aligned arrows or byte columns. For long examples (more than six lines in Magic Vault), add a descriptive disclosure title; short examples remain visible:
+
+````markdown
+```{.text collapse="true" title="Byte layout"}
+...complete aligned diagram...
+```
+````
+
+Text disclosures share their top row with Copy, work by touch or keyboard without JavaScript, and retain the complete original text for copying and printing. Avoid squeezing long diagrams into tiny type or clipping them inside vertical scrollboxes.
 
 ## Test
 

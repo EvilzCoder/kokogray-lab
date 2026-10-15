@@ -120,6 +120,76 @@ def check_reference_theme(page, base, checks):
     checks.append("Reference article widths and container-responsive headings from 320 to 1920 pixels")
 
 
+def check_top_theme_toggle(page, base, checks):
+    article = base + "introduction-to-blockchain/magic-vault/"
+    page.emulate_media(reduced_motion="reduce")
+    for width in (320, 390, 639, 640, 768, 1023, 1024, 1280, 1440, 1920):
+        page.set_viewport_size({"width": width, "height": 844})
+        page.goto(article, wait_until="networkidle")
+        page.evaluate("document.fonts.ready")
+        toggle = page.locator(".site-header [data-toggle-theme]")
+        picker = ".outline-footer" if width >= 1280 else ".mobile-page-theme"
+        for theme in ("dark", "light"):
+            page.locator(f"{picker} [data-set-theme='{theme}']").click()
+            page.evaluate("window.scrollTo(0, 0)")
+            other = "light" if theme == "dark" else "dark"
+            expect(toggle).to_have_attribute("aria-label", f"Switch to {other} mode")
+            expect(toggle).to_have_attribute("title", f"Switch to {other} mode")
+            expect(toggle.locator(f".theme-toggle-{other}")).to_be_visible()
+            expect(toggle.locator(f".theme-toggle-{theme}")).not_to_be_visible()
+            box = toggle.bounding_box()
+            header = page.locator(".site-header").bounding_box()
+            identity = page.locator(".header-identity").bounding_box()
+            actions = page.locator(".header-actions").bounding_box()
+            search = page.locator(".search-trigger").bounding_box()
+            assert box["width"] >= 44 and box["height"] >= 44, (width, box)
+            assert 0 <= box["y"] and box["y"] + box["height"] <= header["height"], (width, box)
+            assert identity["x"] + identity["width"] <= actions["x"], width
+            assert box["x"] + box["width"] <= search["x"], width
+            assert_no_horizontal_overflow(page)
+            toggle.focus()
+            toggle.press("Enter")
+            expect(page.locator("html")).to_have_attribute("data-theme", other)
+            expect(page.locator("html")).to_have_attribute("data-theme-preference", other)
+            expect(toggle).to_have_attribute("aria-label", f"Switch to {theme} mode")
+            assert page.evaluate("localStorage.getItem('kokogray-theme')") == other
+            assert page.locator("[data-set-theme]").evaluate_all(
+                "(buttons, selected) => buttons.every(button => button.getAttribute('aria-pressed') === String(button.dataset.setTheme === selected))",
+                other,
+            )
+            toggle.press("Space")
+            expect(page.locator("html")).to_have_attribute("data-theme", theme)
+        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        assert 0 <= toggle.bounding_box()["y"] < 64, width
+        if width in (390, 1440):
+            page.evaluate("window.scrollTo(0, 0)")
+            page.screenshot(path=str(RESULTS / f"top-theme-{width}.png"))
+    checks.append("Top light/dark toggle fits 320–1920px headers, stays reachable, and supports keyboard switching")
+
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(article, wait_until="networkidle")
+    toggle = page.locator("[data-toggle-theme]")
+    page.locator(".mobile-page-theme [data-set-theme='dark']").click()
+    toggle.click()
+    page.reload(wait_until="networkidle")
+    expect(page.locator("html")).to_have_attribute("data-theme", "light")
+    expect(toggle).to_have_attribute("aria-label", "Switch to dark mode")
+    page.goto(base, wait_until="networkidle")
+    expect(page.locator("html")).to_have_attribute("data-theme", "light")
+    page.locator(".mobile-page-theme [data-set-theme='system']").click()
+    page.emulate_media(color_scheme="dark")
+    expect(toggle).to_have_attribute("aria-label", "Switch to light mode")
+    expect(toggle.locator(".theme-toggle-light")).to_be_visible()
+    page.emulate_media(color_scheme="light")
+    expect(toggle).to_have_attribute("aria-label", "Switch to dark mode")
+    expect(toggle.locator(".theme-toggle-dark")).to_be_visible()
+    toggle.click()
+    expect(page.locator("html")).to_have_attribute("data-theme-preference", "dark")
+    page.emulate_media(color_scheme="light")
+    expect(page.locator("html")).to_have_attribute("data-theme", "dark")
+    checks.append("Top toggle persists across pages and stays synchronized with Light/System/Dark controls")
+
+
 def contrast_ratio(foreground, background):
     def luminance(color):
         channels = [int(value) / 255 for value in re.findall(r"\d+", color)[:3]]
@@ -154,7 +224,24 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
             expect(page.locator('.code-block[data-language="solidity"]')).to_have_count(33)
             expect(page.locator('.code-block[data-language="console"]')).to_have_count(1)
             expect(page.locator('.code-block[data-language="text"]')).to_have_count(27)
-            expect(page.locator(".code-disclosure:not([open])")).to_have_count(2)
+            expect(page.locator(".code-disclosure:not([open])")).to_have_count(4)
+            text_blocks = page.locator('.code-block[data-language="text"]').filter(has=page.locator('.code-disclosure'))
+            expect(text_blocks).to_have_count(2)
+            for index in range(2):
+                block = text_blocks.nth(index)
+                disclosure = block.locator('.code-disclosure')
+                assert block.bounding_box()["height"] < 100
+                expect(disclosure.locator(".code-show")).to_have_text("Show full text")
+                expect(block.locator(".code-scroll-hint")).not_to_be_visible()
+                expect(block.locator("pre")).to_have_attribute("tabindex", "-1")
+                expected_text = block.locator("code").text_content().removesuffix("\n")
+                copy_button = block.get_by_role("button", name="Copy code", exact=True)
+                copy_button.focus()
+                copy_button.press("Enter")
+                page.wait_for_function("async expected => await navigator.clipboard.readText() === expected", arg=expected_text)
+                disclosure.locator("summary").focus()
+                disclosure.locator("summary").press("Enter")
+                expect(disclosure.locator("pre")).to_be_visible()
 
             for filename, expected_source in expected_contracts.items():
                 block = page.locator(".code-block").filter(has=page.locator(".code-filename", has_text=filename))
@@ -183,6 +270,8 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
               return {
                 language: block.dataset.language,
                 toolbarBottom: toolbar.getBoundingClientRect().bottom,
+                toolbarHeight: toolbar.getBoundingClientRect().height,
+                hintInToolbar: toolbar.contains(block.querySelector('.code-scroll-hint')),
                 copyBottom: copy.getBoundingClientRect().bottom,
                 preTop: pre.getBoundingClientRect().top,
                 overflow: pre.scrollWidth - pre.clientWidth,
@@ -211,6 +300,10 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
                         assert block["copyHeight"] >= 44, block
                 else:
                     assert block["wrap"] is None and block["whiteSpace"] == "pre", block
+                    assert block["hintInToolbar"], block
+                    assert block["toolbarHeight"] <= (45 if width < 640 else 36), block
+                    if width < 640:
+                        assert block["copyHeight"] >= 44, block
                 if block["overflow"] > 1:
                     assert block["hintVisible"], block
 
@@ -255,6 +348,7 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
     checks.append("Magic Vault toolbars, exact full-contract copy, and keyboard disclosures in both themes")
     checks.append("Phone source wrapping, 44px controls, contained unwrapped diagrams, and no code overlays")
     checks.append("All rendered Solidity token categories meet 4.5:1 contrast in light and dark themes")
+    checks.append("Compact text toolbars and two expandable diagrams preserve full text and keyboard copying")
 
     page.set_viewport_size({"width": 390, "height": 844})
     page.goto(article, wait_until="networkidle")
@@ -268,15 +362,16 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
     checks.append("Responsive wrap defaults track viewport changes and preserve explicit block choices")
 
     page.evaluate("window.dispatchEvent(new Event('beforeprint'))")
-    expect(page.locator(".code-disclosure[open]")).to_have_count(2)
+    expect(page.locator(".code-disclosure[open]")).to_have_count(4)
     page.emulate_media(media="print")
-    for index in range(2):
+    for index in range(4):
         expect(page.locator(".code-disclosure pre").nth(index)).to_be_visible()
     expect(page.locator(".code-copy:visible")).to_have_count(0)
+    expect(page.locator(".code-scroll-hint:visible")).to_have_count(0)
     page.emulate_media(media="screen")
     page.evaluate("window.dispatchEvent(new Event('afterprint'))")
-    expect(page.locator(".code-disclosure:not([open])")).to_have_count(2)
-    checks.append("Printing expands full contracts and restores their disclosure state afterward")
+    expect(page.locator(".code-disclosure:not([open])")).to_have_count(4)
+    checks.append("Printing expands full contracts and text diagrams, then restores disclosure states")
     context.close()
 
     no_js = browser.new_context(java_script_enabled=False, viewport={"width": 390, "height": 844})
@@ -286,26 +381,29 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
         static_page.goto(article, wait_until="networkidle")
         expect(static_page.locator(".code-toolbar")).to_have_count(61)
         expect(static_page.locator(".code-actions button")).to_have_count(0)
-        expect(static_page.locator('.code-block[data-wrap="preserve"] .code-scroll-hint:visible')).to_have_count(28)
+        expect(static_page.locator('.code-block[data-wrap="preserve"] .code-scroll-hint:visible')).to_have_count(26)
         expect(static_page.locator('.code-block pre[role="region"]')).to_have_count(0)
-        expect(static_page.locator(".code-disclosure:not([open])")).to_have_count(2)
-        for index in range(2):
+        expect(static_page.locator(".code-disclosure:not([open])")).to_have_count(4)
+        expect(static_page.locator("[data-toggle-theme]")).not_to_be_visible()
+        for index in range(4):
             disclosure = static_page.locator(".code-disclosure").nth(index)
             disclosure.locator("summary").focus()
             disclosure.locator("summary").press("Enter")
             expect(disclosure.locator("pre")).to_be_visible()
+        expect(static_page.locator('.code-block[data-wrap="preserve"] .code-scroll-hint:visible')).to_have_count(28)
         assert_no_horizontal_overflow(static_page)
         assert static_page.locator('.code-block[data-language="solidity"] pre').evaluate_all(
             "elements => elements.every(el => el.scrollWidth <= el.clientWidth + 1)"
         )
     static_page.goto(article, wait_until="networkidle")
     static_page.emulate_media(media="print")
-    for index in range(2):
+    for index in range(4):
         pre = static_page.locator(".code-disclosure pre").nth(index)
         expect(pre).to_be_visible()
         assert pre.evaluate("element => element.checkVisibility({contentVisibilityAuto: true})")
+    expect(static_page.locator(".code-scroll-hint:visible")).to_have_count(0)
     no_js.close()
-    checks.append("Full contracts remain keyboard-readable and printable without JavaScript on phones")
+    checks.append("Contracts and text diagrams remain keyboard-readable and printable without JavaScript")
 
 
 def main():
@@ -403,6 +501,7 @@ def main():
             menu = page.get_by_role("button", name="Open navigation", exact=True)
             menu.click()
             expect(page.locator(".site-sidebar")).to_have_attribute("aria-modal", "true")
+            assert page.locator(".site-header").evaluate("element => element.inert")
             expect(page.locator(".site-sidebar [data-close-nav]")).to_be_focused()
             page.screenshot(path=str(RESULTS / "mobile-navigation.png"), full_page=True)
             page.keyboard.press("Shift+Tab")
@@ -447,6 +546,7 @@ def main():
             checks.append("Compact mobile outline keyboard and outside-click dismissal")
 
             check_reference_theme(page, base, checks)
+            check_top_theme_toggle(page, base, checks)
             check_code_blocks(browser, base, origin, checks, errors, failures)
 
             page.goto(base + "404.html", wait_until="networkidle")

@@ -23,15 +23,24 @@
     $$("[data-set-theme]").forEach(button => {
       button.setAttribute("aria-pressed", String(button.dataset.setTheme === preference));
     });
+    const label = `Switch to ${root.dataset.theme === "dark" ? "light" : "dark"} mode`;
+    $$("[data-toggle-theme]").forEach(button => {
+      button.setAttribute("aria-label", label);
+      button.title = label;
+    });
+  }
+
+  function selectTheme(preference) {
+    applyTheme(preference);
+    try { localStorage.setItem("kokogray-theme", preference); } catch { /* Optional persistence. */ }
   }
 
   applyTheme(root.dataset.themePreference || "dark");
   $$("[data-set-theme]").forEach(button => {
-    button.addEventListener("click", () => {
-      const preference = button.dataset.setTheme;
-      applyTheme(preference);
-      try { localStorage.setItem("kokogray-theme", preference); } catch { /* Optional persistence. */ }
-    });
+    button.addEventListener("click", () => selectTheme(button.dataset.setTheme));
+  });
+  $$("[data-toggle-theme]").forEach(button => {
+    button.addEventListener("click", () => selectTheme(root.dataset.theme === "dark" ? "light" : "dark"));
   });
   media.addEventListener("change", () => {
     if (root.dataset.themePreference === "system") applyTheme("system");
@@ -139,7 +148,9 @@
     const button = $(".code-wrap", block);
     const wrapped = block.dataset.wrap === "on" || (block.dataset.wrap === "auto" && phoneCode.matches);
     if (button) button.setAttribute("aria-pressed", String(wrapped));
-    const overflowing = pre.getClientRects().length > 0 && pre.scrollWidth > pre.clientWidth + 1;
+    const disclosure = $(".code-disclosure", block);
+    const overflowing = (!disclosure || disclosure.open) && pre.getClientRects().length > 0 &&
+      pre.scrollWidth > pre.clientWidth + 1;
     pre.tabIndex = overflowing ? 0 : -1;
     $(".code-scroll-hint", block).hidden = !overflowing;
   }

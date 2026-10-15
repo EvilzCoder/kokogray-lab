@@ -1,9 +1,9 @@
-.mobile-menu, .search-trigger, .theme-picker, .page-utilities button {
+.mobile-menu, .search-trigger, .theme-picker, .theme-toggle, .page-utilities button {
   display: none !important;
 }
 
 @media screen {
-  .code-block[data-wrap="preserve"] .code-scroll-hint[hidden] {
+  .code-block[data-wrap="preserve"]:not(:has(.code-disclosure:not([open]))) .code-scroll-hint[hidden] {
     display: block !important;
   }
 }

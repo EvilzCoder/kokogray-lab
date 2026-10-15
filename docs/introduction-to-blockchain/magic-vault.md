@@ -404,7 +404,7 @@ Example
 
 ရလာတဲ့ left နဲ့ right value တွေကို OR မယ် ဆိုရင် အဖြေက ဒီလိုရပါတယ်။ bitwise OR ရဲ့ သဘောတရားက နေရာတူ bit နှစ်ခုကို နှိုင်းယှဉ်ပြီး တစ်ခုခုက 1 ဖြစ်ရင် 1 ထုတ်ပေးတယ်။
 
-```text
+```{.text collapse="true"}
 right = 00 00 00 00 10 23 32 45
 left  = 32 45 54 67 76 89 00 00
         -----------------------
@@ -435,7 +435,7 @@ OR   = 1010 1011 = 0xAB
 
 ### Architecture overview
 
-```text
+```{.text collapse="true"}
              Setup ကို deploy လုပ်သူ
                        │
                        │ 1 ETH နဲ့ deploy

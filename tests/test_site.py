@@ -24,6 +24,7 @@ class Page(HTMLParser):
         self.title_count = 0
         self.images_without_alt = []
         self.body = {}
+        self.theme_toggles = []
         self.feed(content)
 
     def handle_starttag(self, tag, attributes):
@@ -40,6 +41,8 @@ class Page(HTMLParser):
             self.images_without_alt.append(attrs)
         if tag == "body":
             self.body = attrs
+        if "data-toggle-theme" in attrs:
+            self.theme_toggles.append((tag, attrs))
 
 
 class SiteTests(unittest.TestCase):
@@ -59,6 +62,20 @@ class SiteTests(unittest.TestCase):
                 self.assertEqual(page.title_count, 1)
                 self.assertEqual(len(page.ids), len(set(page.ids)), "Duplicate HTML ids")
                 self.assertFalse(page.images_without_alt)
+
+    def test_each_page_has_an_accessible_theme_toggle_in_the_header(self):
+        for path, page in self.pages.items():
+            with self.subTest(page=path.relative_to(SITE)):
+                self.assertEqual(len(page.theme_toggles), 1)
+                tag, attributes = page.theme_toggles[0]
+                self.assertEqual(tag, "button")
+                self.assertEqual(attributes.get("type"), "button")
+                self.assertEqual(attributes.get("aria-label"), "Switch to light mode")
+                self.assertEqual(attributes.get("title"), "Switch to light mode")
+                content = path.read_text(encoding="utf-8")
+                header = re.search(r'<header class="site-header">.*?</header>', content, re.S)
+                self.assertIsNotNone(header)
+                self.assertIn("data-toggle-theme", header.group())
 
     def test_local_links_assets_and_anchors(self):
         for path, page in self.pages.items():

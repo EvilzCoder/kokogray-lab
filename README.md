@@ -9,7 +9,7 @@ This is an independent static website, not the hosted GitBook product. It uses t
 ## Features
 
 - Locally hosted fonts and assets; no frontend CDN or Node.js requirement.
-- Dark by default, with persistent light / dark / system theme controls.
+- Dark by default, with a light/dark toggle in the top bar and persistent light / dark / system theme controls.
 - Nested sidebar, breadcrumbs, scroll-aware outline, and previous/next pages.
 - Full-content local search with Ctrl/⌘ K, arrow-key navigation, and Enter to open.
 - Mobile navigation with focus management, keyboard dismissal, and a page outline.
@@ -86,7 +86,7 @@ contract Vault {
 
 Omit `collapse="true"` for short snippets. Disclosures are native HTML and can be opened without JavaScript. Keep the full source in the fence: Copy includes it even when its disclosure is closed. Format long expressions across lines and dedent standalone snippets without changing their behavior.
 
-Source code wraps by default on phones; the toolbar's **Wrap** toggle can preserve source lines or enable wrapping on desktop. Wrapping is visual only and never changes copied text. `text` and `console` blocks retain their alignment and scroll horizontally, with a scroll hint when needed. Copy and Wrap live above the code rather than covering its first line. Line-number options are intentionally disabled so every copyable block keeps a single clean source container.
+Source code wraps by default on phones; the toolbar's **Wrap** toggle can preserve source lines or enable wrapping on desktop. Wrapping is visual only and never changes copied text. `text` and `console` blocks retain their alignment and scroll horizontally, with a scroll hint inside their compact toolbar when needed. Use `{.text collapse="true"}` for unusually long diagrams; short explanations should stay open. Copy and Wrap live above the code rather than covering its first line. Line-number options are intentionally disabled so every copyable block keeps a single clean source container.
 
 ## Test
 

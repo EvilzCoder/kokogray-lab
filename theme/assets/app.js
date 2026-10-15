@@ -132,7 +132,36 @@
     }
   }));
 
-  $$(".codehilite").forEach(block => {
+  const phoneCode = matchMedia("(max-width: 639px)");
+  const codeBlocks = $$(".code-block");
+  function updateCodeBlock(block) {
+    const pre = $("pre", block);
+    const button = $(".code-wrap", block);
+    const wrapped = block.dataset.wrap === "on" || (block.dataset.wrap === "auto" && phoneCode.matches);
+    if (button) button.setAttribute("aria-pressed", String(wrapped));
+    const overflowing = pre.getClientRects().length > 0 && pre.scrollWidth > pre.clientWidth + 1;
+    pre.tabIndex = overflowing ? 0 : -1;
+    $(".code-scroll-hint", block).hidden = !overflowing;
+  }
+  function updateCodeBlocks() { codeBlocks.forEach(updateCodeBlock); }
+
+  codeBlocks.forEach(block => {
+    const actions = $(".code-actions", block);
+    const pre = $("pre", block);
+    if (block.dataset.wrap !== "preserve") {
+      const wrap = document.createElement("button");
+      wrap.type = "button";
+      wrap.className = "code-wrap";
+      wrap.setAttribute("aria-label", "Wrap lines");
+      wrap.title = "Wrap lines";
+      wrap.textContent = "Wrap";
+      wrap.addEventListener("click", () => {
+        block.dataset.wrap = wrap.getAttribute("aria-pressed") === "true" ? "off" : "on";
+        pre.scrollLeft = 0;
+        updateCodeBlock(block);
+      });
+      actions.append(wrap);
+    }
     const button = document.createElement("button");
     button.type = "button";
     button.className = "code-copy";
@@ -140,7 +169,24 @@
     button.title = "Copy code";
     button.textContent = "Copy";
     button.addEventListener("click", () => copy($("code", block).textContent.replace(/\n$/, ""), "Code copied"));
-    block.append(button);
+    actions.append(button);
+    $(".code-disclosure", block)?.addEventListener("toggle", () => updateCodeBlock(block));
+  });
+  updateCodeBlocks();
+  phoneCode.addEventListener("change", updateCodeBlocks);
+  window.addEventListener("resize", updateCodeBlocks);
+  document.fonts.ready.then(updateCodeBlocks);
+
+  const printDisclosures = new Set();
+  window.addEventListener("beforeprint", () => {
+    $$(".code-disclosure:not([open])").forEach(details => {
+      printDisclosures.add(details);
+      details.open = true;
+    });
+  });
+  window.addEventListener("afterprint", () => {
+    printDisclosures.forEach(details => { details.open = false; });
+    printDisclosures.clear();
   });
 
   const headings = $$(".page-content h2[id], .page-content h3[id]");

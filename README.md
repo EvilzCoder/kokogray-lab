@@ -70,6 +70,24 @@ Open the local URL printed by MkDocs. It reloads when Markdown or the theme chan
 
 The starter notebook includes a [writeup template](docs/2026/lab-notebook/writeup-template.md). Starter pages are labeled as guides/templates and do not claim completed challenges.
 
+### Code blocks
+
+Always label fences: `solidity`, `python`, or the relevant language for source; `sh` for shell commands; `console` for terminal transcripts; and `text` for diagrams, byte layouts, and explanatory output. Language guessing stays disabled so plain output is not accidentally highlighted.
+
+Use fence attributes for filenames and an optional full-code disclosure:
+
+````markdown
+```{.solidity filename="Vault.sol" collapse="true"}
+contract Vault {
+    // Complete source goes here.
+}
+```
+````
+
+Omit `collapse="true"` for short snippets. Disclosures are native HTML and can be opened without JavaScript. Keep the full source in the fence: Copy includes it even when its disclosure is closed. Format long expressions across lines and dedent standalone snippets without changing their behavior.
+
+Source code wraps by default on phones; the toolbar's **Wrap** toggle can preserve source lines or enable wrapping on desktop. Wrapping is visual only and never changes copied text. `text` and `console` blocks retain their alignment and scroll horizontally, with a scroll hint when needed. Copy and Wrap live above the code rather than covering its first line. Line-number options are intentionally disabled so every copyable block keeps a single clean source container.
+
 ## Test
 
 Use the virtual environment's Python, or activate it before running:

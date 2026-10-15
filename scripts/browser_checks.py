@@ -5,6 +5,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
+import re
 import threading
 from urllib.parse import unquote, urlsplit
 
@@ -117,6 +118,194 @@ def check_reference_theme(page, base, checks):
                 page.evaluate("window.scrollTo(0, 0)")
                 page.screenshot(path=str(RESULTS / f"reference-mobile-{theme}.png"))
     checks.append("Reference article widths and container-responsive headings from 320 to 1920 pixels")
+
+
+def contrast_ratio(foreground, background):
+    def luminance(color):
+        channels = [int(value) / 255 for value in re.findall(r"\d+", color)[:3]]
+        linear = [value / 12.92 if value <= .04045 else ((value + .055) / 1.055) ** 2.4 for value in channels]
+        return sum(value * weight for value, weight in zip(linear, (.2126, .7152, .0722)))
+
+    low, high = sorted((luminance(foreground), luminance(background)))
+    return (high + .05) / (low + .05)
+
+
+def check_code_blocks(browser, base, origin, checks, errors, failures):
+    context = browser.new_context(
+        viewport={"width": 390, "height": 844}, has_touch=True, reduced_motion="reduce",
+    )
+    context.grant_permissions(["clipboard-read", "clipboard-write"], origin=origin)
+    page = context.new_page()
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.on("response", lambda response: failures.append(f"{response.status} {response.url}") if response.status >= 400 else None)
+    article = base + "introduction-to-blockchain/magic-vault/"
+    source = (ROOT / "docs/introduction-to-blockchain/magic-vault.md").read_text(encoding="utf-8")
+    expected_contracts = dict(re.findall(r'```\{\.solidity filename="([^"]+)"[^\n]*\}\n(.*?)\n```', source, re.S))
+    assert set(expected_contracts) == {"Setup.sol", "Vault.sol", "Solver.sol"}
+
+    for width in (320, 390, 768, 1440):
+        for theme in ("dark", "light"):
+            page.set_viewport_size({"width": width, "height": 844 if width < 640 else 1000})
+            page.goto(article, wait_until="networkidle")
+            page.evaluate("document.fonts.ready")
+            theme_picker = ".outline-footer" if width >= 1280 else ".mobile-page-theme"
+            page.locator(f"{theme_picker} [data-set-theme='{theme}']").click()
+            expect(page.locator(".code-block")).to_have_count(61)
+            expect(page.locator('.code-block[data-language="solidity"]')).to_have_count(33)
+            expect(page.locator('.code-block[data-language="console"]')).to_have_count(1)
+            expect(page.locator('.code-block[data-language="text"]')).to_have_count(27)
+            expect(page.locator(".code-disclosure:not([open])")).to_have_count(2)
+
+            for filename, expected_source in expected_contracts.items():
+                block = page.locator(".code-block").filter(has=page.locator(".code-filename", has_text=filename))
+                expect(block.locator(".code-language")).to_have_text("Solidity")
+                assert block.locator("code").text_content().removesuffix("\n") == expected_source
+                if filename != "Setup.sol":
+                    assert block.bounding_box()["height"] < 160, filename
+                button = block.get_by_role("button", name="Copy code", exact=True)
+                button.focus()
+                button.press("Enter")
+                expect(page.locator(".toast")).to_have_text("Code copied")
+                page.wait_for_function("async expected => await navigator.clipboard.readText() === expected", arg=expected_source)
+                if filename != "Setup.sol":
+                    summary = block.locator("summary")
+                    summary.focus()
+                    summary.press("Enter")
+                    expect(block.locator(".code-disclosure")).to_have_attribute("open", "")
+                    expect(block.locator("pre")).to_be_visible()
+
+            assert_no_horizontal_overflow(page)
+            layout = page.locator(".code-block").evaluate_all("""blocks => blocks.map(block => {
+              const pre = block.querySelector('pre');
+              const toolbar = block.querySelector('.code-toolbar');
+              const copy = block.querySelector('.code-copy');
+              const code = block.querySelector('code');
+              return {
+                language: block.dataset.language,
+                toolbarBottom: toolbar.getBoundingClientRect().bottom,
+                copyBottom: copy.getBoundingClientRect().bottom,
+                preTop: pre.getBoundingClientRect().top,
+                overflow: pre.scrollWidth - pre.clientWidth,
+                verticalOverflow: pre.scrollHeight - pre.clientHeight,
+                font: getComputedStyle(code).fontSize,
+                whiteSpace: getComputedStyle(code).whiteSpace,
+                wrap: block.querySelector('.code-wrap')?.getAttribute('aria-pressed'),
+                copyHeight: copy.getBoundingClientRect().height,
+                tabIndex: pre.tabIndex,
+                role: pre.getAttribute('role'),
+                hintVisible: !block.querySelector('.code-scroll-hint').hidden
+              };
+            })""")
+            for block in layout:
+                assert block["copyBottom"] <= block["preTop"] + .1, block
+                assert block["toolbarBottom"] <= block["preTop"] + .1, block
+                assert block["font"] == "14px", block
+                assert block["verticalOverflow"] <= 1, block
+                assert block["role"] == "group", block
+                assert block["tabIndex"] == (0 if block["overflow"] > 1 else -1), block
+                if block["language"] == "solidity":
+                    assert block["wrap"] == ("true" if width < 640 else "false"), block
+                    assert block["whiteSpace"] == ("pre-wrap" if width < 640 else "pre"), block
+                    if width < 640:
+                        assert block["overflow"] <= 1, block
+                        assert block["copyHeight"] >= 44, block
+                else:
+                    assert block["wrap"] is None and block["whiteSpace"] == "pre", block
+                if block["overflow"] > 1:
+                    assert block["hintVisible"], block
+
+            tokens = page.locator('.code-block[data-language="solidity"] code span').evaluate_all("""elements => {
+              const result = {};
+              elements.forEach(element => {
+                if (!element.textContent.trim()) return;
+                const block = element.closest('.code-block');
+                result[element.className] = {
+                  color: getComputedStyle(element).color,
+                  background: getComputedStyle(block).backgroundColor,
+                  foreground: getComputedStyle(block).color
+                };
+              });
+              return result;
+            }""")
+            for name, token in tokens.items():
+                assert contrast_ratio(token["color"], token["background"]) >= 4.5, (theme, name, token)
+            for name in ("kt", "nv", "ni"):
+                assert tokens[name]["color"] != tokens[name]["foreground"], (theme, name)
+
+            vault = page.locator(".code-block").filter(has=page.locator(".code-filename", has_text="Vault.sol"))
+            wrap = vault.get_by_role("button", name="Wrap lines", exact=True)
+            expected_initial = "true" if width < 640 else "false"
+            wrap.focus()
+            wrap.press("Space")
+            expect(wrap).to_have_attribute("aria-pressed", "false" if width < 640 else "true")
+            expect(vault.locator("code")).to_have_css("white-space", "pre" if width < 640 else "pre-wrap")
+            vault.get_by_role("button", name="Copy code", exact=True).click()
+            page.wait_for_function("async expected => await navigator.clipboard.readText() === expected", arg=expected_contracts["Vault.sol"])
+            wrap.click()
+            expect(wrap).to_have_attribute("aria-pressed", expected_initial)
+            if width in (390, 1440):
+                page.locator("#setupsol").evaluate("element => element.scrollIntoView()")
+                page.screenshot(path=str(RESULTS / f"code-{width}-{theme}-setup.png"))
+                vault.scroll_into_view_if_needed()
+                page.screenshot(path=str(RESULTS / f"code-{width}-{theme}-vault.png"))
+                vault.locator("summary").click()
+                vault.scroll_into_view_if_needed()
+                page.screenshot(path=str(RESULTS / f"code-{width}-{theme}-collapsed.png"))
+
+    checks.append("Magic Vault toolbars, exact full-contract copy, and keyboard disclosures in both themes")
+    checks.append("Phone source wrapping, 44px controls, contained unwrapped diagrams, and no code overlays")
+    checks.append("All rendered Solidity token categories meet 4.5:1 contrast in light and dark themes")
+
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(article, wait_until="networkidle")
+    first_wrap = page.locator(".code-wrap").first
+    expect(first_wrap).to_have_attribute("aria-pressed", "true")
+    page.set_viewport_size({"width": 1440, "height": 1000})
+    expect(first_wrap).to_have_attribute("aria-pressed", "false")
+    first_wrap.click()
+    page.set_viewport_size({"width": 390, "height": 844})
+    expect(first_wrap).to_have_attribute("aria-pressed", "true")
+    checks.append("Responsive wrap defaults track viewport changes and preserve explicit block choices")
+
+    page.evaluate("window.dispatchEvent(new Event('beforeprint'))")
+    expect(page.locator(".code-disclosure[open]")).to_have_count(2)
+    page.emulate_media(media="print")
+    for index in range(2):
+        expect(page.locator(".code-disclosure pre").nth(index)).to_be_visible()
+    expect(page.locator(".code-copy:visible")).to_have_count(0)
+    page.emulate_media(media="screen")
+    page.evaluate("window.dispatchEvent(new Event('afterprint'))")
+    expect(page.locator(".code-disclosure:not([open])")).to_have_count(2)
+    checks.append("Printing expands full contracts and restores their disclosure state afterward")
+    context.close()
+
+    no_js = browser.new_context(java_script_enabled=False, viewport={"width": 390, "height": 844})
+    static_page = no_js.new_page()
+    for width in (320, 390):
+        static_page.set_viewport_size({"width": width, "height": 844})
+        static_page.goto(article, wait_until="networkidle")
+        expect(static_page.locator(".code-toolbar")).to_have_count(61)
+        expect(static_page.locator(".code-actions button")).to_have_count(0)
+        expect(static_page.locator('.code-block[data-wrap="preserve"] .code-scroll-hint:visible')).to_have_count(28)
+        expect(static_page.locator('.code-block pre[role="region"]')).to_have_count(0)
+        expect(static_page.locator(".code-disclosure:not([open])")).to_have_count(2)
+        for index in range(2):
+            disclosure = static_page.locator(".code-disclosure").nth(index)
+            disclosure.locator("summary").focus()
+            disclosure.locator("summary").press("Enter")
+            expect(disclosure.locator("pre")).to_be_visible()
+        assert_no_horizontal_overflow(static_page)
+        assert static_page.locator('.code-block[data-language="solidity"] pre').evaluate_all(
+            "elements => elements.every(el => el.scrollWidth <= el.clientWidth + 1)"
+        )
+    static_page.goto(article, wait_until="networkidle")
+    static_page.emulate_media(media="print")
+    for index in range(2):
+        pre = static_page.locator(".code-disclosure pre").nth(index)
+        expect(pre).to_be_visible()
+        assert pre.evaluate("element => element.checkVisibility({contentVisibilityAuto: true})")
+    no_js.close()
+    checks.append("Full contracts remain keyboard-readable and printable without JavaScript on phones")
 
 
 def main():
@@ -258,6 +447,7 @@ def main():
             checks.append("Compact mobile outline keyboard and outside-click dismissal")
 
             check_reference_theme(page, base, checks)
+            check_code_blocks(browser, base, origin, checks, errors, failures)
 
             page.goto(base + "404.html", wait_until="networkidle")
             expect(page.locator(".page-title")).to_have_text("Page not found")

@@ -4,6 +4,73 @@ from html import escape
 from pathlib import Path
 import re
 
+from pygments.formatters import HtmlFormatter
+from pygments.lexers import get_lexer_by_name
+from pygments.util import ClassNotFound
+
+
+class CodeBlockFormatter(HtmlFormatter):
+    """Keep code metadata and controls outside the copyable source."""
+
+    def __init__(self, lang_str="language-text", **options):
+        options["linenos"] = False  # Keep line-number markup out of the copyable source.
+        super().__init__(**options)
+        language = lang_str.removeprefix("language-")
+        self.language = language if re.fullmatch(r"[\w.+#-]+", language) else "text"
+        self.code_filename = self.filename
+        self.filename = ""
+        self.collapsible = str(options.get("collapse", "false")).lower() == "true"
+        self.preserve_lines = self.language in {
+            "text", "txt", "plaintext", "console", "shell-session", "pycon",
+        }
+        try:
+            self.language_label = get_lexer_by_name(self.language).name
+        except ClassNotFound:
+            self.language_label = "Text"
+        if self.language in {"text", "txt", "plaintext"}:
+            self.language_label = "Text"
+        elif self.language in {"console", "shell-session"}:
+            self.language_label = "Terminal"
+
+    def wrap(self, source):
+        filename = escape(self.code_filename)
+        language = escape(self.language, quote=True)
+        label = escape(self.language_label)
+        kind = "block" if self.preserve_lines else "source code"
+        region = escape(f"{self.code_filename or self.language_label} {kind}", quote=True)
+        yield 0, '<div class="code-toolbar"><div class="code-label">'
+        if filename:
+            yield 0, f'<span class="code-filename">{filename}</span>'
+        yield 0, f'<span class="code-language">{label}</span></div>'
+        yield 0, '<div class="code-actions"></div></div>'
+        if self.collapsible:
+            noun = "contract" if self.language == "solidity" else "code"
+            yield 0, (
+                '<details class="code-disclosure"><summary>'
+                f'<span class="code-show">Show full {noun}</span>'
+                f'<span class="code-hide">Hide full {noun}</span>'
+                '</summary><div class="code-body">'
+            )
+        yield 0, f'<pre tabindex="0" role="group" aria-label="{region}"><code class="language-{language}">'
+        yield from source
+        yield 0, '</code></pre>'
+        if self.collapsible:
+            yield 0, '</div></details>'
+        yield 0, '<div class="code-scroll-hint" hidden aria-hidden="true">Scroll horizontally to read &rarr;</div>'
+
+    def _wrap_div(self, inner):
+        classes = escape(f"{self.cssclass} code-block", quote=True)
+        language = escape(self.language, quote=True)
+        wrap = "preserve" if self.preserve_lines else "auto"
+        yield 0, f'<div class="{classes}" data-language="{language}" data-wrap="{wrap}">'
+        yield from inner
+        yield 0, '</div>\n'
+
+
+def on_config(config):
+    config["mdx_configs"].setdefault("codehilite", {})["pygments_formatter"] = CodeBlockFormatter
+    return config
+
 
 def on_page_markdown(markdown, page, config, files):
     """Expose source Markdown for Copy page without exposing front matter."""

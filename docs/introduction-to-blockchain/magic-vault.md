@@ -14,7 +14,7 @@ Alex walked through the monster's dorm, her sword drawn. As she explored, she fo
 ပထမဆုံး Challenge ကို Source Code .zip file ပေးထားပါတယ်။ အဲ့ Source code ကို download ဆွဲပြီးတော့ ဖြည်ကြည့်လိုက်တဲ့အခါ `Setup.sol` နဲ့ `Vault.sol` ဆိုပြီး ရလာပါတယ်။
 
 ### Setup.sol
-```solidity
+```{.solidity filename="Setup.sol"}
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
@@ -48,10 +48,10 @@ Vault public immutable TARGET;
 ပြီးတော့ Vault ဆိုတဲ့ Contract Type ကို အသုံးပြုပြီးတော့ `TARGET` variable ကို သတ်မှတ်ပေးပါတယ်။ ဒီမှာ `immutable` ဆိုတာ Code Standard အနေနဲ့ မဖြစ်မနေ ထည့်ရတဲ့ keyword မဟုတ်ပါဘူး။ Contract ကို တည်ဆောက်တဲ့အချိန်မှာ တန်ဖိုးသတ်မှတ်ပေးနိုင်ပြီး deploy လုပ်ပြီးသွားတဲ့အခါ ပြန်ပြောင်းလို့ မရတော့ဘူး ဆိုတဲ့ သဘောပါ။ ဒီ Contract မှာတော့ constructor() ထဲမှာ `TARGET` ရဲ့ တန်ဖိုးကို သတ်မှတ်ပေးထားပါတယ်။
 
 ```solidity
-    constructor() payable {
-        require(msg.value == 1 ether);
-        TARGET = new Vault();
-    }
+constructor() payable {
+    require(msg.value == 1 ether);
+    TARGET = new Vault();
+}
 ```
 
 Setup ရဲ့ constructor() မှာ `payable` keyword ကို အသုံးပြုပြီးတော့ deploy လုပ်တဲ့ transaction နဲ့အတူ ETH လက်ခံလို့ ရအောင် လုပ်ထားပါတယ်။ constructor() က payable မဟုတ်ရင် deploy လုပ်တဲ့အချိန် ETH တွဲပို့လို့ မရပါဘူး။ ဒီမှာ `msg.value` က အဲ့ transaction နဲ့ တွဲပို့လိုက်တဲ့ ETH ပမာဏကို wei unit နဲ့ ဖော်ပြတာဖြစ်ပြီး 1 ether က 10^18 wei နဲ့ ညီပါတယ်။
@@ -65,9 +65,9 @@ constructor() ဆိုတာ Setup Contract ကို deploy လုပ်တဲ
 ထို့နောက် `new Vault()` နဲ့ Vault Contract အသစ်တခုကို deploy လုပ်ပြီး အဲ့ Contract ကို ရည်ညွှန်းတဲ့ တန်ဖိုးကို `TARGET` ထဲမှာ သိမ်းပေးလိုက်ပါတယ်။ Contract ရဲ့ နာမည်ကို သတ်မှတ်တာ မဟုတ်ပါဘူး။ ဒီမှာ `{value: ...}` နဲ့ ETH လွှဲပေးထားတာ မရှိတဲ့အတွက် Setup က လက်ခံထားတဲ့ 1 ETH ကို Vault ဆီ ဆက်ပို့တာ မဟုတ်ဘဲ Setup ထဲမှာပဲ ကျန်နေပါတယ်။
 
 ```solidity
-    function isSolved() public view returns (bool) {
-        return TARGET.mapHolder() != address(TARGET);
-    }
+function isSolved() public view returns (bool) {
+    return TARGET.mapHolder() != address(TARGET);
+}
 ```
 
 ဒီ Challenge တခုလုံး solve ဖြစ်သွားဖို့ အတွက် isSolved() ဆိုတဲ့ Function တခုရှိပါတယ်။
@@ -87,7 +87,7 @@ constructor() ဆိုတာ Setup Contract ကို deploy လုပ်တဲ
 
 ### Vault.sol
 
-```solidity
+```{.solidity filename="Vault.sol" collapse="true"}
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
@@ -104,7 +104,9 @@ contract Vault {
 
     constructor() {
         owner = msg.sender;
-        passphrase = bytes32(keccak256(abi.encodePacked(uint256(blockhash(block.timestamp)))));
+        passphrase = bytes32(
+            keccak256(abi.encodePacked(uint256(blockhash(block.timestamp))))
+        );
         map = Map(address(this));
     }
 
@@ -122,19 +124,36 @@ contract Vault {
         uint128 _input = uint128(_password);
         require(_input != _secretKey, "Case 1 failed");
         require(uint64(_input) == _secretKey, "Case 2 failed");
-        require(uint64(bytes8(_password)) == uint64(uint160(owner)), "Case 3 failed");
+        require(
+            uint64(bytes8(_password)) == uint64(uint160(owner)),
+            "Case 3 failed"
+        );
         isUnlocked = true;
     }
 
     function _generateKey(uint256 _reductor) private returns (uint256 ret) {
-        ret = uint256(keccak256(abi.encodePacked(uint256(blockhash(block.number - _reductor)) + nonce)));
+        ret = uint256(
+            keccak256(
+                abi.encodePacked(
+                    uint256(blockhash(block.number - _reductor)) + nonce
+                )
+            )
+        );
         nonce++;
     }
 
     function _magicPassword() private returns (bytes8) {
         uint256 _key1 = _generateKey(block.timestamp % 2 + 1);
         uint128 _key2 = uint128(_generateKey(2));
-        bytes8 _secret = bytes8(bytes16(uint128(uint128(bytes16(bytes32(uint256(uint256(passphrase) ^ _key1)))) ^ _key2)));
+        bytes8 _secret = bytes8(
+            bytes16(
+                uint128(
+                    uint128(
+                        bytes16(bytes32(uint256(uint256(passphrase) ^ _key1)))
+                    ) ^ _key2
+                )
+            )
+        );
         return (_secret >> 32 | _secret << 16);
     }
 }
@@ -142,9 +161,9 @@ contract Vault {
 #### Understanding the source code
 
 ```solidity
-    struct Map {
-        address holder;
-    }
+struct Map {
+    address holder;
+}
 ```
 
 Vault.sol ရဲ့ Vault Contract ထဲမှာ `Map` ဆိုတဲ့ struct တခုကို တည်ဆောက်ထားပါတယ်။ `Map` ဆိုတာ struct ရဲ့ နာမည်ဖြစ်ပြီး `map` ကတော့ အဲ့ struct type နဲ့ ကြေညာထားတဲ့ variable နာမည်ဖြစ်ပါတယ်။ `map` က Solidity keyword မဟုတ်ပါဘူး။ Solidity ရဲ့ `mapping` type နဲ့လည်း မတူပါဘူး။
@@ -152,11 +171,11 @@ Vault.sol ရဲ့ Vault Contract ထဲမှာ `Map` ဆိုတဲ့ stru
 struct ဆိုသည်မှာ အုပ်စုတခုထဲတွင် `data type` အများအပြား ကို သိမ်းဆည်းပေးထားနိုင်သည့် Custom Data Type ဖြစ်သည်။ ယခု Code တွင် `address holder` တမျိုးတည်းသာ ရှိပါသည်။
 
 ```solidity
-    Map map;
-    address public owner;
-    bytes32 private passphrase;
-    uint256 public nonce;
-    bool public isUnlocked;
+Map map;
+address public owner;
+bytes32 private passphrase;
+uint256 public nonce;
+bool public isUnlocked;
 ```
 
 public state variable များကို Solidity က `getter function` အလိုအလျောက် ဖန်တီးပေးပြီး အခြားပြင်ပမှ contract များ ဖတ်ရှုနိုင်ရန် ခွင့်ပြုပေးထားပါသည်။ public ဖြစ်တာက အပြင်ကနေ တန်ဖိုးကို ကြိုက်သလို ပြောင်းလို့ရတယ် ဆိုတဲ့သဘော မဟုတ်ပါဘူး။
@@ -166,21 +185,25 @@ private variable များကိုတော့ Solidity က `getter function
 `Map map;` မှာ visibility မရေးထားတဲ့အတွက် default က internal ဖြစ်ပါတယ်။ `nonce` နဲ့ `isUnlocked` ကို အစတန်ဖိုး သတ်မှတ်မထားတဲ့အတွက် 0 နဲ့ false ကနေ စပါတယ်။
 
 ```solidity
-    constructor() {
-        owner = msg.sender;
-        passphrase = bytes32(keccak256(abi.encodePacked(uint256(blockhash(block.timestamp)))));
-        map = Map(address(this));
-    }
+constructor() {
+    owner = msg.sender;
+    passphrase = bytes32(
+        keccak256(abi.encodePacked(uint256(blockhash(block.timestamp))))
+    );
+    map = Map(address(this));
+}
 ```
 constructor() ဖြင့် တကြိမ်သာ run မည့် code ဖြစ်ပါသည်။
 
 `owner` ဆိုတဲ့ public variable ထဲမှာ Vault ကို ဖန်တီးတဲ့ Setup Contract ရဲ့ address ကို ထည့်ပေးလိုက်တာဖြစ်ပါတယ်။ Setup ထဲကနေ `new Vault()` ကို ခေါ်ထားတဲ့အတွက် Vault ရဲ့ constructor() ထဲမှာ msg.sender က Setup Contract ဖြစ်ပါတယ်။ Vault Contract ကိုယ်တိုင်ရဲ့ address ကတော့ `address(this)` ဖြစ်ပါတယ်။
 
-```
-        passphrase = bytes32(keccak256(abi.encodePacked(uint256(blockhash(block.timestamp)))));
+```solidity
+passphrase = bytes32(
+    keccak256(abi.encodePacked(uint256(blockhash(block.timestamp))))
+);
 ```
 passphrase ဆိုတာ bytes32 type ရှိတဲ့ private variable တခုဖြစ်ပါတယ်။ ဒီ code က block.timestamp ကို hash လုပ်တာ မဟုတ်ပါဘူး။ လက်ရှိ block ရဲ့ Unix Timestamp ကို block number လို့ ယူပြီး `blockhash()` ထဲ ထည့်ပေးထားတာ ဖြစ်ပါတယ်။
-```
+```console
 ┌──(kali㉿kali)-[~]
 └─$ cast block  latest --field number --rpc-url "http://154.57.164.69:37795/rpc"
 338
@@ -197,7 +220,7 @@ block.timestamp ရဲ့ type က uint256 ဖြစ်ပါတယ်။ အပ
 
 သတိထားရမှာက passphrase ကို constructor() run တဲ့ block မှာပဲ တွက်ပြီး သိမ်းတာဖြစ်ပါတယ်။ အပေါ်က command တွေက latest block ကို ကြည့်ထားတာဖြစ်လို့ deploy လုပ်ခဲ့တဲ့ block ရဲ့ တန်ဖိုးတွေကို တိုက်ရိုက်ပြထားတာ မဟုတ်ပါဘူး။ Deploy လုပ်တဲ့အချိန်မှာလည်း timestamp က block number ထက် ကြီးနေခဲ့ရင် အထက်က hash ပဲ ရပါမယ်။ အတည်ပြုချင်ရင် deployment block ကို စစ်တာ ဒါမှမဟုတ် Vault ရဲ့ passphrase storage ကို ဖတ်တာ လုပ်နိုင်ပါတယ်။
 
-```
+```solidity
 map = Map(address(this));
 ```
 
@@ -206,42 +229,59 @@ map = Map(address(this));
 ဒီမှာ `Map(address(this))` နဲ့ struct value အသစ်တခု ဖန်တီးပြီး `map` ထဲမှာ သိမ်းလိုက်တာပါ။ Struct ရဲ့ field တွေကို ကြေညာထားတဲ့ အစီအစဉ်အတိုင်း တန်ဖိုးပေးတဲ့ syntax ကို သုံးထားတဲ့အတွက် `holder` ဆိုတဲ့ နာမည်ကို ထည့်မရေးထားတာဖြစ်ပါတယ်။ `Map({holder: address(this)})` လို့လည်း ရေးလို့ရပါတယ်။ ဒါကြောင့် နောက်ဆုံး map.holder ရဲ့ တန်ဖိုးက Vault Contract address ဖြစ်ပါတယ်။
 
 ```solidity
-    function mapHolder() public view returns (address) {
-        return map.holder;
-    }
+function mapHolder() public view returns (address) {
+    return map.holder;
+}
 ```
 
 map.holder ရဲ့ Getter function ဖြစ်ပါတယ် ။ `public` keyword ပါတဲ့ အတွက် အခြား Contract မှလည်း ခေါ်လို့ရပါတယ်။
 
 ```solidity
-    function claimContent() public {
-        require(isUnlocked);
-        map.holder = msg.sender;
-    }
+function claimContent() public {
+    require(isUnlocked);
+    map.holder = msg.sender;
+}
 ```
 isUnlocked ဆိုတဲ့ bool variable ကို အရင်စစ်ဆေးပါတယ်။ ဒီနေရာမှာ isUnlocked() getter ကို ခေါ်တာ မဟုတ်ပါဘူး။ isUnlocked က false ဖြစ်ရင် revert ဖြစ်ပြီး true ဖြစ်ရင် map.holder ကို claimContent() function ခေါ်တဲ့ msg.sender ရဲ့ address အဖြစ် ပြောင်းပေးပါတယ်။ Wallet က တိုက်ရိုက်ခေါ်ရင် wallet address၊ Contract က ခေါ်ရင် အဲ့ Contract address ဖြစ်ပါမယ်။ ဒါကြောင့် Challenge ကို solve ဖို့ unlock() နဲ့ isUnlocked ကို true ဖြစ်အောင် လုပ်ပြီး claimContent() ကို ဆက်ခေါ်ရပါမယ်။
 
 ```solidity
-    function unlock(bytes16 _password) public {
-        uint128 _secretKey = uint128(bytes16(_magicPassword()) >> 64);
-        uint128 _input = uint128(_password);
-        require(_input != _secretKey, "Case 1 failed");
-        require(uint64(_input) == _secretKey, "Case 2 failed");
-        require(uint64(bytes8(_password)) == uint64(uint160(owner)), "Case 3 failed");
-        isUnlocked = true;
-    }
+function unlock(bytes16 _password) public {
+    uint128 _secretKey = uint128(bytes16(_magicPassword()) >> 64);
+    uint128 _input = uint128(_password);
+    require(_input != _secretKey, "Case 1 failed");
+    require(uint64(_input) == _secretKey, "Case 2 failed");
+    require(
+        uint64(bytes8(_password)) == uint64(uint160(owner)),
+        "Case 3 failed"
+    );
+    isUnlocked = true;
+}
 
-    function _generateKey(uint256 _reductor) private returns (uint256 ret) {
-        ret = uint256(keccak256(abi.encodePacked(uint256(blockhash(block.number - _reductor)) + nonce)));
-        nonce++;
-    }
+function _generateKey(uint256 _reductor) private returns (uint256 ret) {
+    ret = uint256(
+        keccak256(
+            abi.encodePacked(
+                uint256(blockhash(block.number - _reductor)) + nonce
+            )
+        )
+    );
+    nonce++;
+}
 
-    function _magicPassword() private returns (bytes8) {
-        uint256 _key1 = _generateKey(block.timestamp % 2 + 1);
-        uint128 _key2 = uint128(_generateKey(2));
-        bytes8 _secret = bytes8(bytes16(uint128(uint128(bytes16(bytes32(uint256(uint256(passphrase) ^ _key1)))) ^ _key2)));
-        return (_secret >> 32 | _secret << 16);
-    }
+function _magicPassword() private returns (bytes8) {
+    uint256 _key1 = _generateKey(block.timestamp % 2 + 1);
+    uint128 _key2 = uint128(_generateKey(2));
+    bytes8 _secret = bytes8(
+        bytes16(
+            uint128(
+                uint128(
+                    bytes16(bytes32(uint256(uint256(passphrase) ^ _key1)))
+                ) ^ _key2
+            )
+        )
+    );
+    return (_secret >> 32 | _secret << 16);
+}
 ```
 ပထမဆုံး _generateKey ဆိုတဲ့ function ကို ကြည့်ရမှာဖြစ်ပြီးတော့ Contract အတွင်းမှာသာ ခေါ်လို့ ရမဲ့ private function ဖြစ်ပါတယ်။ `returns (uint256 ret)` ဆိုပြီး return variable ကို နာမည်ပေးထားတဲ့အတွက် ret ထဲမှာ တန်ဖိုးထည့်ပြီး function အဆုံးရောက်ရင် အဲ့တန်ဖိုးကို ပြန်ပေးပါတယ်။ `return ret;` လို့ သီးသန့် ထပ်ရေးဖို့ မလိုပါဘူး။
 
@@ -257,7 +297,7 @@ _key1 က _generateKey function ကို အသုံးပြုပါတယ�
 
 _key2 ကလည်း _generateKey ကို အသုံးပြုပါတယ်။ _reductor ရဲ့ တန်ဖိုးကို အမြဲ 2 အဖြစ် ထားပါတယ်။ ပြီးတော့ ရလာတဲ့ တန်ဖိုး ကို uint128 ပြောင်းပါတယ်။ သို့သော် _generateKey function ရဲ့ တန်ဖိုးက uint256 ဖြစ်တဲ့ အတွက် uint128 အဖြစ် cast လုပ်တဲ့အခါ 256-bit ထဲကနေ အရှေ့ဆုံး 128-bit ကို truncate လုပ်လိုက်ပါတယ်။
 
-```
+```text
 y = x mod 2^{128}
 
 y = x ကို 2^{128} နဲ့ စားလို့ ရမဲ့ အကြွင်း
@@ -269,7 +309,7 @@ _secret ကို တွက်ထုတ်ဖို့ ပထမ bytes32 passphr
 
 ![alt text](image-1.png)
 
-```
+```text
  XOR ရဲ့ သဘောတရား က
 
 နေရာတူ bit ၂ ခု မတူရင် 1 ဖြစ်ပြီး
@@ -280,7 +320,7 @@ _secret ကို တွက်ထုတ်ဖို့ ပထမ bytes32 passphr
 
 ထို့နောက် ရလာတဲ့ uint256 value ကို bytes32 အဖြစ် ပြောင်းပါတယ်။ bytes32 တန်ဖိုးကို bytes16 အဖြစ် cast လုပ်လိုက်တဲ့အခါ အရှေ့ဆုံး 16 bytes ကို ယူပြီး အနောက်ဆုံး 16 bytes ကို ဖြတ်ချပါတယ်။ [00] နဲ့ အစားထိုးတာ မဟုတ်ပါဘူး။
 
-```
+```text
 ဥပမာ passphrase နဲ့ _key1 ကို XOR လုပ်ပြီး ရလာတဲ့ bytes32 က
 
 0x11223344556677889900aabbccddeeffffeeddccbbaa00998877665544332211
@@ -299,14 +339,16 @@ bytes16 result : 0x11223344556677889900aabbccddeeff
 ရလာတဲ့ bytes16 ကို uint128 ပြောင်းတဲ့အခါ size တူတဲ့အတွက် bit တွေ မပြောင်းပါဘူး။ ဒါပေမဲ့ ဒီနေရာမှာ _key2 နဲ့ XOR ထပ်လုပ်ထားတာကို မမေ့ရပါဘူး။ အဲ့ XOR ကြောင့် တန်ဖိုး ပြောင်းနိုင်ပါတယ်။ နောက်ထပ် uint128 cast ကတော့ uint128 ဖြစ်ပြီးသားတန်ဖိုးကို ထပ် cast လုပ်တာဖြစ်လို့ တန်ဖိုးမပြောင်းပါဘူး။
 
 ```solidity
-uint128 firstHalf = uint128(bytes16(bytes32(uint256(passphrase) ^ _key1)));
+uint128 firstHalf = uint128(
+    bytes16(bytes32(uint256(passphrase) ^ _key1))
+);
 uint128 mixed = firstHalf ^ _key2;
 bytes8 _secret = bytes8(bytes16(mixed));
 ```
 
 ဒီ code က မူလ expression အရှည်ကြီးကို ဖတ်ရလွယ်အောင် ခွဲရေးထားတာပါ။ ဥပမာ အောက်က တန်ဖိုးတွေနဲ့ တွက်ကြည့်ပါမယ်။
 
-```
+```text
 firstHalf : 0x11223344556677889900aabbccddeeff
 _key2     : 0x01010101010101010000000000000000
             ----------------------------------
@@ -315,7 +357,7 @@ mixed     : 0x10233245546776899900aabbccddeeff
 
 mixed ကို bytes16 ပြောင်းပြီး bytes8 ထပ်ပြောင်းတဲ့အခါ အရှေ့ဆုံး 8 bytes ကိုပဲ ယူပါတယ်။
 
-```
+```text
 [10][23][32][45][54][67][76][89] --- < ယူမဲ့ အပိုင်း >
 [99][00][aa][bb][cc][dd][ee][ff] --- < ဖြတ်ချမဲ့ အပိုင်း >
 
@@ -324,13 +366,13 @@ bytes8 result : 0x1023324554677689
 
 ဒါဆိုရင် ဒီဥပမာအတွက် _secret တန်ဖိုးရပါပြီ။ အောက်က shift ဥပမာမှာလည်း အဲ့ တန်ဖိုးကိုပဲ ဆက်သုံးပါမယ်။
 
-```
-        return (_secret >> 32 | _secret << 16);
+```solidity
+return (_secret >> 32 | _secret << 16);
 ```
 
 ရလာတဲ့ bytes8 _secret တန်ဖိုးကို ညာဘက် 32-bit ရွှေ့ထားတဲ့ ရလဒ်တခုနဲ့ ဘယ်ဘက် 16-bit ရွှေ့ထားတဲ့ ရလဒ်တခု သီးသန့်တွက်ပါတယ်။ ညာဘက်ရွှေ့ပြီးသားကို ဆက်ပြီး ဘယ်ဘက်ရွှေ့တာ မဟုတ်ပါဘူး။ ရလဒ်နှစ်ခုကို | operator နဲ့ OR ပါမယ်။
 
-```
+```text
 Example
 
 မူလ:
@@ -341,12 +383,12 @@ Example
                                           ဘောင်အပြင်ရောက်လို့ ပျောက်
 
 ```
-```
+```text
 ရလဒ် : right == 0x0000000010233245;
 
 ```
 
-```
+```text
 Example
 
 မူလ:
@@ -356,13 +398,13 @@ Example
 [10] [23]  ←  [32] [45] [54] [67] [76] [89] [00] [00]
 ပျောက်
 ```
-```
+```text
 ရလဒ် : left == 0x3245546776890000;
 ```
 
 ရလာတဲ့ left နဲ့ right value တွေကို OR မယ် ဆိုရင် အဖြေက ဒီလိုရပါတယ်။ bitwise OR ရဲ့ သဘောတရားက နေရာတူ bit နှစ်ခုကို နှိုင်းယှဉ်ပြီး တစ်ခုခုက 1 ဖြစ်ရင် 1 ထုတ်ပေးတယ်။
 
-```
+```text
 right = 00 00 00 00 10 23 32 45
 left  = 32 45 54 67 76 89 00 00
         -----------------------
@@ -393,7 +435,7 @@ OR   = 1010 1011 = 0xAB
 
 ### Architecture overview
 
-```
+```text
              Setup ကို deploy လုပ်သူ
                        │
                        │ 1 ETH နဲ့ deploy
@@ -437,15 +479,18 @@ OR   = 1010 1011 = 0xAB
 
 ဒီ Smart Contract ကို Exploit မလုပ်ခင်မှာ အောက်က unlock() function ကို အရင်ဆုံး နားလည်ထားဖို့လိုပါတယ်။
 
-```
-    function unlock(bytes16 _password) public {
-        uint128 _secretKey = uint128(bytes16(_magicPassword()) >> 64);
-        uint128 _input = uint128(_password);
-        require(_input != _secretKey, "Case 1 failed");
-        require(uint64(_input) == _secretKey, "Case 2 failed");
-        require(uint64(bytes8(_password)) == uint64(uint160(owner)), "Case 3 failed");
-        isUnlocked = true;
-    }
+```solidity
+function unlock(bytes16 _password) public {
+    uint128 _secretKey = uint128(bytes16(_magicPassword()) >> 64);
+    uint128 _input = uint128(_password);
+    require(_input != _secretKey, "Case 1 failed");
+    require(uint64(_input) == _secretKey, "Case 2 failed");
+    require(
+        uint64(bytes8(_password)) == uint64(uint160(owner)),
+        "Case 3 failed"
+    );
+    isUnlocked = true;
+}
 ```
 
 ခုနက _magicPassword() function ကနေ bytes8 တန်ဖိုးကို return ပြန်ပေးတာ သိပြီးပါပြီ။ အဲ့ တန်ဖိုးကို unlock() function ထဲမှာ ဘယ်လိုပြန်သုံးထားလဲ ဆိုတာ အရင်ကြည့်ပါမယ်။
@@ -456,7 +501,7 @@ uint128 _secretKey = uint128(bytes16(_magicPassword()) >> 64);
 
 ဒီမှာ _magicPassword() က ရလာတဲ့ bytes8 ကို bytes16 အဖြစ် အရင် cast လုပ်ပါတယ်။ bytes type ကို အငယ်ကနေ အကြီး ပြောင်းတဲ့အချိန်မှာ အနောက်ဘက်မှာ [00] တွေ ထပ်ဖြည့်ပေးပါတယ်။
 
-```
+```text
 ဥပမာ _magicPassword() က ပြန်ပေးတဲ့ တန်ဖိုးက
 
 bytes8  : 0x3245546776ab3245
@@ -465,7 +510,7 @@ bytes16 : 0x3245546776ab32450000000000000000
 
 ပြီးတော့ >> 64 ဆိုပြီး ညာဘက်ကို 64-bit ရွှေ့ပါတယ်။ 8-bit က 1 byte ဖြစ်တဲ့အတွက် 64-bit ဆိုရင် 8 bytes ဖြစ်ပါတယ်။
 
-```
+```text
 မူလ:
 [32][45][54][67][76][ab][32][45][00][00][00][00][00][00][00][00]
 
@@ -485,7 +530,7 @@ _password က bytes16 ဖြစ်တဲ့အတွက် 128-bit ရှိပ�
 
 ဒီတော့ password ကို အရှေ့ပိုင်း 8 bytes နဲ့ အနောက်ပိုင်း 8 bytes ဆိုပြီး နှစ်ပိုင်းခွဲကြည့်ပါမယ်။
 
-```
+```text
                  bytes16 _password
 
 [ အရှေ့ပိုင်း 8 bytes ][ အနောက်ပိုင်း 8 bytes ]
@@ -503,7 +548,7 @@ require(_input != _secretKey, "Case 1 failed");
 
 ဒီမှာ _secretKey ကို သိရုံနဲ့ password အဖြစ် တန်းထည့်ပေးလို့ မရပါဘူး။ တူသွားရင် Case 1 failed ဆိုပြီး transaction က revert ဖြစ်သွားမှာပါ။
 
-```
+```text
 _secretKey : 0x00000000000000003245546776ab3245
 _input     : 0x00000000000000003245546776ab3245
 
@@ -522,7 +567,7 @@ require(uint64(_input) == _secretKey, "Case 2 failed");
 
 uint128 ကနေ uint64 အဖြစ် ပြောင်းလိုက်တဲ့အချိန်မှာ အရှေ့ပိုင်း 64-bit ကို ဖြတ်ချပြီး အနောက်ဆုံး 64-bit ကိုပဲ ယူပါတယ်။
 
-```
+```text
 _input : 0x11223344556677883245546776ab3245
 
 အရှေ့ပိုင်း                အနောက်ပိုင်း
@@ -541,7 +586,10 @@ _secretKey    : 0x3245546776ab3245
 ### Case 3
 
 ```solidity
-require(uint64(bytes8(_password)) == uint64(uint160(owner)), "Case 3 failed");
+require(
+    uint64(bytes8(_password)) == uint64(uint160(owner)),
+    "Case 3 failed"
+);
 ```
 
 ဒီမှာ bytes8(_password) ဆိုတဲ့ အပိုင်းကို သတိထားရပါမယ်။ ခုနက uint64(_input) နဲ့ မတူပါဘူး။
@@ -551,7 +599,7 @@ require(uint64(bytes8(_password)) == uint64(uint160(owner)), "Case 3 failed");
 
 အပေါ်က _secret တွက်တဲ့နေရာမှာလိုပဲ fixed-size bytes type ကို အငယ်ပြောင်းတဲ့အချိန်မှာ အရှေ့ပိုင်းကို ယူပြီး အနောက်ပိုင်းကို ဖြတ်ချပါတယ်။ ဒါကြောင့် ဒီ Case 3 က password ရဲ့ အရှေ့ပိုင်း 8 bytes ကို စစ်တာဖြစ်ပါတယ်။
 
-```
+```text
 _password         : 0x11223344556677883245546776ab3245
 bytes8(_password) : 0x1122334455667788
 
@@ -560,7 +608,7 @@ uint64(bytes8(_password)) : 0x1122334455667788
 
 ညာဘက်က uint64(uint160(owner)) ကိုလည်း ကြည့်ပါမယ်။ owner က address type ဖြစ်တဲ့အတွက် 20 bytes ၊ တနည်းအားဖြင့် 160-bit ရှိပါတယ်။ uint160 ပြောင်းလိုက်တော့ အဲ့ address ကို integer အဖြစ် ယူလိုက်တာပါ။ ပြီးမှ uint64 ပြောင်းတဲ့အတွက် အနောက်ဆုံး 8 bytes ပဲ ကျန်ပါမယ်။
 
-```
+```text
 ဥပမာ owner address က
 
 0xaabbccddeeff0011223344551122334455667788
@@ -570,7 +618,7 @@ uint64(uint160(owner)) : 0x1122334455667788
 
 ဒီမှာ owner က ဘယ်သူလဲ ဆိုတာ ပြန်ကြည့်ပါမယ်။ အပေါ်က constructor() မှာ ရှင်းထားတဲ့အတိုင်း Vault ကို new Vault() နဲ့ ဖန်တီးတာက Setup Contract ဖြစ်လို့ owner က Setup Contract ရဲ့ address ဖြစ်ပါတယ်။ Vault ရဲ့ address ကိုယ်တိုင် မဟုတ်ပါဘူး။
 
-```
+```text
 Vault constructor() ထဲမှာ
 
 msg.sender    = Setup Contract address
@@ -586,7 +634,7 @@ map.holder    = Vault Contract address
 
 condition သုံးခုကို ပြန်ပေါင်းကြည့်လိုက်ရင် ကျွန်တော်တို့ ထည့်ပေးရမဲ့ password ပုံစံက ဒီလိုဖြစ်ပါတယ်။
 
-```
+```text
                   bytes16 _password
 
 [ owner ရဲ့ နောက်ဆုံး 8 bytes ][ _secretKey 8 bytes ]
@@ -611,7 +659,7 @@ bytes16 password = bytes16(upper | lower);
 
 owner ရဲ့ နောက်ဆုံး 8 bytes ကို uint128 အဖြစ် အရင်ပြောင်းပြီး ဘယ်ဘက် 64-bit ရွှေ့ပါတယ်။ uint64 အဖြစ်နဲ့ပဲ 64-bit ရွှေ့လိုက်ရင် bit တွေအကုန် ဘောင်အပြင်ရောက်ပြီး ပျောက်သွားမှာဖြစ်လို့ uint128 ကို အရင်ပြောင်းပေးရတာပါ။
 
-```
+```text
 upper : 0x11223344556677880000000000000000
 lower : 0x00000000000000003245546776ab3245
         ----------------------------------
@@ -635,7 +683,7 @@ uint128 _key2 = uint128(_generateKey(2));
 
 _key1 တွက်တဲ့နေရာမှာလည်း အစီအစဉ်ကို သတိထားရပါမယ်။ _generateKey() ရဲ့ return တန်ဖိုးကို % 2 + 1 လုပ်တာ မဟုတ်ဘဲ block.timestamp % 2 + 1 ကို အရင်တွက်ပြီး ရလာတဲ့ 1 သို့မဟုတ် 2 ကို _reductor အဖြစ် ထည့်ပေးတာဖြစ်ပါတယ်။
 
-```
+```text
 block.timestamp က စုံကိန်းဆိုရင်
 _reductor = 0 + 1 = 1
 
@@ -648,7 +696,9 @@ nonce ကလည်း _generateKey() တကြိမ်ခေါ်တိုင�
 ပြီးတော့ _secret တွက်တဲ့ expression ထဲမှာ passphrase နဲ့ _key1 ကို XOR လုပ်ပြီး ရလာတဲ့ bytes32 ရဲ့ အရှေ့ဆုံး 16 bytes ကို ယူပါတယ်။ အဲ့ တန်ဖိုးကို uint128 ပြောင်းပြီး _key2 နဲ့ ထပ်ပြီး XOR လုပ်ဖို့လည်း လိုပါသေးတယ်။ cast တွေပဲ ဆက်လုပ်ပြီး _key2 နဲ့ XOR လုပ်တဲ့အပိုင်း ကျန်သွားလို့ မရပါဘူး။
 
 ```solidity
-uint128 firstHalf = uint128(bytes16(bytes32(uint256(passphrase) ^ _key1)));
+uint128 firstHalf = uint128(
+    bytes16(bytes32(uint256(passphrase) ^ _key1))
+);
 uint128 mixed = firstHalf ^ _key2;
 bytes8 secret = bytes8(bytes16(mixed));
 bytes8 magicPassword = (secret >> 32) | (secret << 16);
@@ -660,7 +710,7 @@ bytes8 magicPassword = (secret >> 32) | (secret << 16);
 
 ဒါကြောင့် helper contract တခုထဲမှာ key ကို တွက်ပြီး အဲ့ transaction တခုတည်းအတွင်းမှာပဲ Vault ရဲ့ unlock() ကို ဆက်ခေါ်ပေးတဲ့နည်းကို သုံးပါမယ်။ ဒီလိုဆို helper contract နဲ့ Vault နှစ်ခုလုံးက block.number ၊ block.timestamp နဲ့ အရင် block တွေရဲ့ blockhash တွေကို တူတူပဲ မြင်ရမှာပါ။ nonce ကိုတော့ Vault ဆီက ဖတ်ပြီး helper ဘက်မှာ local variable နဲ့ တွက်ရမှာဖြစ်ပါတယ်။
 
-```
+```text
 Wallet က helper contract ကို ခေါ်မယ်
                   │
                   ▼
@@ -687,7 +737,7 @@ unlock() က condition သုံးခုလုံး ကျော်သွာ�
 
 အပေါ်မှာ ရှင်းခဲ့တဲ့ helper contract ပုံစံကို ကျွန်တော်က Solver.sol နဲ့ ရေးပြီး ဖြေရှင်းခဲ့ပါတယ်။ code အပြည့်အစုံကို အရင်ကြည့်ပါမယ်။
 
-```solidity
+```{.solidity filename="Solver.sol" collapse="true"}
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
@@ -733,13 +783,37 @@ owner ရဲ့ နောက် 8 bytes   = AABBCCDDEEFF0011
         uint256 nonce = vault.nonce();
         address owner = vault.owner();
 
-        key1 = uint256(keccak256(abi.encodePacked(uint256(blockhash(block.number - (block.timestamp % 2 + 1))) + nonce)));
+        key1 = uint256(
+            keccak256(
+                abi.encodePacked(
+                    uint256(
+                        blockhash(block.number - (block.timestamp % 2 + 1))
+                    ) + nonce
+                )
+            )
+        );
         nonce = nonce + 1;
 
-        key2 = uint128(uint256(keccak256(abi.encodePacked(uint256(blockhash(block.number - 2)) + nonce))));
+        key2 = uint128(
+            uint256(
+                keccak256(
+                    abi.encodePacked(
+                        uint256(blockhash(block.number - 2)) + nonce
+                    )
+                )
+            )
+        );
         nonce = nonce + 1;
 
-        bytes8 _secret = bytes8(bytes16(uint128(uint128(bytes16(bytes32(uint256(uint256(passphrase) ^ key1)))) ^ key2)));
+        bytes8 _secret = bytes8(
+            bytes16(
+                uint128(
+                    uint128(
+                        bytes16(bytes32(uint256(uint256(passphrase) ^ key1)))
+                    ) ^ key2
+                )
+            )
+        );
         bytes8 magicPassword = (_secret >> 32 | _secret << 16);
         uint128 _secretKey = uint128(bytes16(magicPassword) >> 64);
 
@@ -803,10 +877,23 @@ nonce ကိုတော့ 0 လို့ တခါတည်း မသတ်မ
 ### key1 နဲ့ key2 ကို တွက်မယ်
 
 ```solidity
-key1 = uint256(keccak256(abi.encodePacked(uint256(blockhash(block.number - (block.timestamp % 2 + 1))) + nonce)));
+key1 = uint256(
+    keccak256(
+        abi.encodePacked(
+            uint256(blockhash(block.number - (block.timestamp % 2 + 1)))
+                + nonce
+        )
+    )
+);
 nonce = nonce + 1;
 
-key2 = uint128(uint256(keccak256(abi.encodePacked(uint256(blockhash(block.number - 2)) + nonce))));
+key2 = uint128(
+    uint256(
+        keccak256(
+            abi.encodePacked(uint256(blockhash(block.number - 2)) + nonce)
+        )
+    )
+);
 nonce = nonce + 1;
 ```
 
@@ -814,7 +901,7 @@ nonce = nonce + 1;
 
 Vault က _generateKey() တခါခေါ်ပြီးတိုင်း nonce ကို 1 တိုးတာကြောင့် Solver ဘက်မှာလည်း key1 တွက်ပြီးတာနဲ့ local nonce ကို 1 တိုးပေးရပါတယ်။ ဒါမှ key2 တွက်တဲ့နေရာမှာ သုံးတဲ့ nonce က Vault နဲ့ တူမှာဖြစ်ပါတယ်။
 
-```
+```text
 Vault ဆီက ဖတ်လာတဲ့ nonce = n
 
 Solver တွက်တဲ့အချိန်
@@ -833,7 +920,14 @@ key2 အောက်က ဒုတိယ nonce = nonce + 1 ကတော့ Vault 
 ### _secretKey ကို ပြန်တွက်မယ်
 
 ```solidity
-bytes8 _secret = bytes8(bytes16(uint128(uint128(bytes16(bytes32(uint256(uint256(passphrase) ^ key1)))) ^ key2)));
+bytes8 _secret = bytes8(
+    bytes16(
+        uint128(
+            uint128(bytes16(bytes32(uint256(uint256(passphrase) ^ key1))))
+                ^ key2
+        )
+    )
+);
 bytes8 magicPassword = (_secret >> 32 | _secret << 16);
 uint128 _secretKey = uint128(bytes16(magicPassword) >> 64);
 ```
@@ -857,7 +951,7 @@ ownerLow က owner address ရဲ့ နောက်ဆုံး 8 bytes ပါ�
 
 solve() အပေါ်က comment ထဲမှာ ရေးထားတဲ့ goal ကို ဒီနေရာမှာ ပြန်ကြည့်လို့ရပါတယ်။ အဲ့ထဲက hex တန်ဖိုးတွေက ပုံစံမြင်ရဖို့ ပေးထားတဲ့ ဥပမာတွေပါ။ code ကတော့ owner နဲ့ _secretKey ကို တွက်ပြီး password ကို တည်ဆောက်တာဖြစ်ပါတယ်။
 
-```
+```text
 front      = AABBCCDDEEFF0011 0000000000000000
 _secretKey = 0000000000000000 1122334455667788
              ---------------------------------
@@ -883,7 +977,7 @@ password ရပြီဆိုတာနဲ့ Vault ရဲ့ unlock() ကို
 
 unlock() အောင်မြင်ရင် isUnlocked က true ဖြစ်သွားပြီး နောက်တကြောင်းက claimContent() ကို ဆက်ခေါ်ပါတယ်။ ဒီ call နှစ်ခုလုံးမှာ Vault က မြင်တဲ့ msg.sender က Solver Contract ရဲ့ address ဖြစ်ပါတယ်။ Wallet က solve() ကို စခေါ်ခဲ့ပေမဲ့ Vault ကို တိုက်ရိုက်ခေါ်တာက Solver ဖြစ်နေလို့ပါ။
 
-```
+```text
 Wallet
   │
   └── Solver.solve(Vault address)
@@ -901,7 +995,7 @@ Wallet
 
 transaction အောင်မြင်ပြီးတဲ့အခါ မျှော်လင့်ရတဲ့ အခြေအနေက ဒီလိုဖြစ်ပါတယ်။ ဒါက တကယ့် RPC output မဟုတ်ဘဲ စစ်ကြည့်ရမဲ့ တန်ဖိုးတွေကို ဖော်ပြထားတာပါ။
 
-```
+```text
 Vault.isUnlocked() → true
 Vault.mapHolder()  → Solver Contract address
 Vault.nonce()      → solve() စခေါ်ချိန်က nonce + 2

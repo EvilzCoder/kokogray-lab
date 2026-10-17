@@ -1,12 +1,14 @@
 """Small presentation hooks for the custom documentation theme."""
 
-from html import escape
+from html import escape, unescape
 from pathlib import Path
 import re
 
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_by_name
 from pygments.util import ClassNotFound
+
+from scripts.diagrams import DIAGRAM_TYPES, render_diagram
 
 
 class CodeBlockFormatter(HtmlFormatter):
@@ -24,6 +26,9 @@ class CodeBlockFormatter(HtmlFormatter):
             "text", "txt", "plaintext", "console", "shell-session", "pycon",
         }
         self.flow_text = self.preserve_lines and options.get("layout") == "flow"
+        self.diagram = options.get("diagram") if self.plain_text and options.get("layout") == "diagram" else None
+        if self.plain_text and options.get("layout") == "diagram" and self.diagram not in DIAGRAM_TYPES:
+            raise ValueError("Responsive text diagrams require a supported diagram type")
         self.compact_output = self.plain_text or self.flow_text
         self.text_title = str(options.get("title", "")) if self.compact_output else ""
         try:
@@ -53,11 +58,18 @@ class CodeBlockFormatter(HtmlFormatter):
             if self.preserve_lines:
                 yield 0, '<span class="code-scroll-hint" hidden aria-hidden="true">Scroll horizontally &rarr;</span>'
             yield 0, '</div><div class="code-actions"></div></div>'
-        yield 0, f'<pre tabindex="0" role="group" aria-label="{region}"><code class="language-{language}">'
-        for kind, line in source:
-            if self.plain_text and self.flow_text:
-                line = re.sub(r"\b0x[0-9a-fA-F]{16,}\b", r'<span class="text-value">\g<0></span>', line)
-            yield kind, line
+        if self.diagram:
+            # TextLexer only escapes source; render one visible diagram, not a hidden duplicate listing.
+            original = unescape("".join(line for kind, line in source if kind))
+            copy_source = escape(original, quote=True)
+            yield 0, f'<pre tabindex="0" role="group" aria-label="{region}"><code class="language-{language}" data-copy-source="{copy_source}">'
+            yield 1, render_diagram(self.diagram, original)
+        else:
+            yield 0, f'<pre tabindex="0" role="group" aria-label="{region}"><code class="language-{language}">'
+            for kind, line in source:
+                if self.plain_text and self.flow_text:
+                    line = re.sub(r"\b0x[0-9a-fA-F]{16,}\b", r'<span class="text-value">\g<0></span>', line)
+                yield kind, line
         yield 0, '</code></pre>'
         if self.compact_output or not self.preserve_lines:
             yield 0, '<div class="code-scroll-hint" hidden aria-hidden="true">Scroll horizontally to read &rarr;</div>'
@@ -65,8 +77,9 @@ class CodeBlockFormatter(HtmlFormatter):
     def _wrap_div(self, inner):
         classes = escape(f"{self.cssclass} code-block{' text-block' if self.compact_output else ''}", quote=True)
         language = escape(self.language, quote=True)
-        wrap = "flow" if self.flow_text else "preserve" if self.preserve_lines else "auto"
-        yield 0, f'<div class="{classes}" data-language="{language}" data-wrap="{wrap}">'
+        wrap = "diagram" if self.diagram else "flow" if self.flow_text else "preserve" if self.preserve_lines else "auto"
+        diagram = f' data-diagram="{self.diagram}"' if self.diagram else ""
+        yield 0, f'<div class="{classes}" data-language="{language}" data-wrap="{wrap}"{diagram}>'
         yield from inner
         yield 0, '</div>\n'
 

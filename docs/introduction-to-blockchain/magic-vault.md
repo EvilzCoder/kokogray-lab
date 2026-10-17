@@ -317,7 +317,7 @@ XOR ရဲ့ သဘောတရား က
 
 ထို့နောက် ရလာတဲ့ uint256 value ကို bytes32 အဖြစ် ပြောင်းပါတယ်။ bytes32 တန်ဖိုးကို bytes16 အဖြစ် cast လုပ်လိုက်တဲ့အခါ အရှေ့ဆုံး 16 bytes ကို ယူပြီး အနောက်ဆုံး 16 bytes ကို ဖြတ်ချပါတယ်။ [00] နဲ့ အစားထိုးတာ မဟုတ်ပါဘူး။
 
-```{.text title="Bytes32 to bytes16"}
+```{.text layout="diagram" diagram="bytes" title="Bytes32 to bytes16"}
 ဥပမာ passphrase နဲ့ _key1 ကို XOR လုပ်ပြီး ရလာတဲ့ bytes32 က
 0x11223344556677889900aabbccddeeffffeeddccbbaa00998877665544332211
 အရှေ့ဆုံး 16 bytes — ယူမဲ့ အပိုင်း
@@ -341,7 +341,7 @@ bytes8 _secret = bytes8(bytes16(mixed));
 
 ဒီ code က မူလ expression အရှည်ကြီးကို ဖတ်ရလွယ်အောင် ခွဲရေးထားတာပါ။ ဥပမာ အောက်က တန်ဖိုးတွေနဲ့ တွက်ကြည့်ပါမယ်။
 
-```{.text title="Mixed value"}
+```{.text layout="diagram" diagram="calculation" title="Mixed value"}
 firstHalf : 0x11223344556677889900aabbccddeeff
 _key2     : 0x01010101010101010000000000000000
             ----------------------------------
@@ -350,7 +350,7 @@ mixed     : 0x10233245546776899900aabbccddeeff
 
 mixed ကို bytes16 ပြောင်းပြီး bytes8 ထပ်ပြောင်းတဲ့အခါ အရှေ့ဆုံး 8 bytes ကိုပဲ ယူပါတယ်။
 
-```{.text title="Bytes16 to bytes8"}
+```{.text layout="diagram" diagram="bytes" title="Bytes16 to bytes8"}
 [10][23][32][45][54][67][76][89] --- < ယူမဲ့ အပိုင်း >
 [99][00][aa][bb][cc][dd][ee][ff] --- < ဖြတ်ချမဲ့ အပိုင်း >
 bytes8 result : 0x1023324554677689
@@ -390,7 +390,7 @@ return (_secret >> 32 | _secret << 16);
 
 ရလာတဲ့ left နဲ့ right value တွေကို OR မယ် ဆိုရင် အဖြေက ဒီလိုရပါတယ်။ bitwise OR ရဲ့ သဘောတရားက နေရာတူ bit နှစ်ခုကို နှိုင်းယှဉ်ပြီး တစ်ခုခုက 1 ဖြစ်ရင် 1 ထုတ်ပေးတယ်။
 
-```{.text title="Bitwise OR"}
+```{.text layout="diagram" diagram="calculation" title="Bitwise OR"}
 right = 00 00 00 00 10 23 32 45
 left  = 32 45 54 67 76 89 00 00
         -----------------------
@@ -413,7 +413,7 @@ OR   = 1010 1011 = 0xAB
 
 ### Architecture overview
 
-```{.text title="Architecture"}
+```{.text layout="diagram" diagram="boxes" title="Architecture"}
              Setup ကို deploy လုပ်သူ
                        │
                        │ 1 ETH နဲ့ deploy
@@ -481,7 +481,7 @@ bytes16: 0x3245546776ab32450000000000000000
 
 ပြီးတော့ >> 64 ဆိုပြီး ညာဘက်ကို 64-bit ရွှေ့ပါတယ်။ 8-bit က 1 byte ဖြစ်တဲ့အတွက် 64-bit ဆိုရင် 8 bytes ဖြစ်ပါတယ်။
 
-```{.text title="64-bit shift"}
+```{.text layout="diagram" diagram="bytes" title="64-bit shift"}
 မူလ:
 [32][45][54][67][76][ab][32][45][00][00][00][00][00][00][00][00]
 ညာဘက် 8 bytes ရွှေ့ပြီး:
@@ -499,7 +499,7 @@ _password က bytes16 ဖြစ်တဲ့အတွက် 128-bit ရှိပ�
 
 ဒီတော့ password ကို အရှေ့ပိုင်း 8 bytes နဲ့ အနောက်ပိုင်း 8 bytes ဆိုပြီး နှစ်ပိုင်းခွဲကြည့်ပါမယ်။
 
-```{.text title="Password halves"}
+```{.text layout="diagram" diagram="halves" title="Password halves"}
                  bytes16 _password
 [ အရှေ့ပိုင်း 8 bytes ][ အနောက်ပိုင်း 8 bytes ]
         upper                  lower
@@ -534,7 +534,7 @@ require(uint64(_input) == _secretKey, "Case 2 failed");
 
 uint128 ကနေ uint64 အဖြစ် ပြောင်းလိုက်တဲ့အချိန်မှာ အရှေ့ပိုင်း 64-bit ကို ဖြတ်ချပြီး အနောက်ဆုံး 64-bit ကိုပဲ ယူပါတယ်။
 
-```{.text title="Input byte layout"}
+```{.text layout="diagram" diagram="halves" title="Input byte layout"}
 _input : 0x11223344556677883245546776ab3245
 အရှေ့ပိုင်း                အနောက်ပိုင်း
 [11][22][33][44]           [32][45][54][67]
@@ -594,7 +594,7 @@ map.holder    = Vault Contract address
 
 condition သုံးခုကို ပြန်ပေါင်းကြည့်လိုက်ရင် ကျွန်တော်တို့ ထည့်ပေးရမဲ့ password ပုံစံက ဒီလိုဖြစ်ပါတယ်။
 
-```{.text title="Password layout"}
+```{.text layout="diagram" diagram="halves" title="Password layout"}
                   bytes16 _password
 [ owner ရဲ့ နောက်ဆုံး 8 bytes ][ _secretKey 8 bytes ]
 ဥပမာ
@@ -615,7 +615,7 @@ bytes16 password = bytes16(upper | lower);
 
 owner ရဲ့ နောက်ဆုံး 8 bytes ကို uint128 အဖြစ် အရင်ပြောင်းပြီး ဘယ်ဘက် 64-bit ရွှေ့ပါတယ်။ uint64 အဖြစ်နဲ့ပဲ 64-bit ရွှေ့လိုက်ရင် bit တွေအကုန် ဘောင်အပြင်ရောက်ပြီး ပျောက်သွားမှာဖြစ်လို့ uint128 ကို အရင်ပြောင်းပေးရတာပါ။
 
-```{.text title="Password bitwise OR"}
+```{.text layout="diagram" diagram="calculation" title="Password bitwise OR"}
 upper : 0x11223344556677880000000000000000
 lower : 0x00000000000000003245546776ab3245
         ----------------------------------
@@ -665,7 +665,7 @@ bytes8 magicPassword = (secret >> 32) | (secret << 16);
 
 ဒါကြောင့် helper contract တခုထဲမှာ key ကို တွက်ပြီး အဲ့ transaction တခုတည်းအတွင်းမှာပဲ Vault ရဲ့ unlock() ကို ဆက်ခေါ်ပေးတဲ့နည်းကို သုံးပါမယ်။ ဒီလိုဆို helper contract နဲ့ Vault နှစ်ခုလုံးက block.number ၊ block.timestamp နဲ့ အရင် block တွေရဲ့ blockhash တွေကို တူတူပဲ မြင်ရမှာပါ။ nonce ကိုတော့ Vault ဆီက ဖတ်ပြီး helper ဘက်မှာ local variable နဲ့ တွက်ရမှာဖြစ်ပါတယ်။
 
-```{.text title="Helper call flow"}
+```{.text layout="diagram" diagram="sequence" title="Helper call flow"}
 Wallet က helper contract ကို ခေါ်မယ်
                   │
                   ▼
@@ -904,7 +904,7 @@ ownerLow က owner address ရဲ့ နောက်ဆုံး 8 bytes ပါ�
 
 solve() အပေါ်က comment ထဲမှာ ရေးထားတဲ့ goal ကို ဒီနေရာမှာ ပြန်ကြည့်လို့ရပါတယ်။ အဲ့ထဲက hex တန်ဖိုးတွေက ပုံစံမြင်ရဖို့ ပေးထားတဲ့ ဥပမာတွေပါ။ code ကတော့ owner နဲ့ _secretKey ကို တွက်ပြီး password ကို တည်ဆောက်တာဖြစ်ပါတယ်။
 
-```{.text title="Password assembly"}
+```{.text layout="diagram" diagram="calculation" title="Password assembly"}
 front      = AABBCCDDEEFF0011 0000000000000000
 _secretKey = 0000000000000000 1122334455667788
              ---------------------------------
@@ -930,7 +930,7 @@ password ရပြီဆိုတာနဲ့ Vault ရဲ့ unlock() ကို
 
 unlock() အောင်မြင်ရင် isUnlocked က true ဖြစ်သွားပြီး နောက်တကြောင်းက claimContent() ကို ဆက်ခေါ်ပါတယ်။ ဒီ call နှစ်ခုလုံးမှာ Vault က မြင်တဲ့ msg.sender က Solver Contract ရဲ့ address ဖြစ်ပါတယ်။ Wallet က solve() ကို စခေါ်ခဲ့ပေမဲ့ Vault ကို တိုက်ရိုက်ခေါ်တာက Solver ဖြစ်နေလို့ပါ။
 
-```{.text title="Contract call flow"}
+```{.text layout="diagram" diagram="tree" title="Contract call flow"}
 Wallet
   │
   └── Solver.solve(Vault address)

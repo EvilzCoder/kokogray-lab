@@ -96,7 +96,11 @@ Plain text preserves columns by default for ASCII diagrams and byte layouts. Use
 ```
 ````
 
-Keep diagram borders, connecting arrows, tree branches, calculation separators, and byte brackets: they convey relationships and are part of the example. Remove only unnecessary empty rows or outer indentation to reduce space; do not flatten diagrams into lists. Preserve aligned diagrams as `text` without `layout="flow"`, allowing horizontal scrolling inside the block when needed instead of breaking their columns. All examples remain readable without JavaScript and print in full. Avoid squeezing diagrams into tiny type or clipping them inside vertical scrollboxes.
+Keep diagram borders, connecting arrows, tree branches, calculation separators, and byte brackets: they convey relationships and are part of the example. For a supported diagram, add `layout="diagram" diagram="…"` to its existing `.text` fence instead of deleting those lines or shrinking the font. The build converts padded ASCII geometry into responsive CSS borders and connected rows. The original fence remains the single authored source; **Copy** returns its original text, and **Copy page** includes the unchanged diagram. There is one visible representation, no hidden duplicate listing, and no JavaScript renderer.
+
+Supported diagram types are `boxes` (closed Setup/Vault-style boxes joined by an explicit TARGET), `sequence` (steps separated by `│` and `▼`), `tree` (indented `├──`/`└──` branches), `calculation` (aligned operands, dashed rule, result), `bytes` (bracketed byte rows), and `halves` (two labeled byte groups). These are deliberately narrow patterns, not a general ASCII-art parser. Invalid structural input fails the build rather than silently discarding it. Diagram labels use the site's 14px/20px reading font; byte cells and numeric values retain the monospace font. Short plain-text examples such as the accepted Left/Right shifts remain unchanged.
+
+All examples stay expanded, readable without JavaScript, and printable in full. Unsupported ASCII art still preserves its source columns inside a horizontal scroller; do not opt it into a responsive pattern unless the visible relationships and all content have regression coverage. Avoid tiny type, vertical clipping, or flattening a connected diagram into an unconnected list.
 
 ## Test
 

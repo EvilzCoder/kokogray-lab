@@ -217,7 +217,7 @@ def magic_vault_fences():
 
 
 def assert_copy_clear_of_source(page):
-    overlaps = page.locator('.text-block[data-wrap="flow"]').evaluate_all(r'''blocks => {
+    overlaps = page.locator('.text-block[data-wrap="flow"], .text-block[data-wrap="diagram"]').evaluate_all(r'''blocks => {
       const overlaps = [];
       for (const [index, block] of blocks.entries()) {
         const copy = block.querySelector('.code-copy');
@@ -248,37 +248,106 @@ def assert_copy_clear_of_source(page):
 
 
 def assert_diagram_structure(page):
-    fixtures = {
-        "Architecture": (31, ("┌" + "─" * 45 + "┐", "└" + "─" * 45 + "┘     │",
-                               "┌" + "─" * 54 + "┐", "└" + "─" * 54 + "┘",
-                               "│  TARGET " + "─" * 36 + "┼─────┐",
-                               "                                                   ▼")),
-        "Mixed value": (4, ("            ----------------------------------",)),
-        "Bitwise OR": (18, ("        -----------------------", "       ---------",
-                            "0x10 = 0001 0000", "0x76 = 0111 0110",
-                            "0x23 = 0010 0011", "0x89 = 1000 1001")),
-        "Password bitwise OR": (4, ("        ----------------------------------",)),
-        "Password assembly": (4, ("             ---------------------------------",)),
-        "Helper call flow": (16, ("                  │", "                  ▼")),
-        "Contract call flow": (11, ("  │", "  └── Solver.solve(Vault address)",
-                                    "        ├── Vault.unlock(password)", "        │",
-                                    "        └── Vault.claimContent()")),
-        "Bytes32 to bytes16": (9, ("[11][22][33][44][55][66][77][88]", "[88][77][66][55][44][33][22][11]")),
-        "Bytes16 to bytes8": (3, ("[10][23][32][45][54][67][76][89] --- < ယူမဲ့ အပိုင်း >",)),
-        "64-bit shift": (5, ("[32][45][54][67][76][ab][32][45][00][00][00][00][00][00][00][00]",)),
-        "Password halves": (4, ("[ အရှေ့ပိုင်း 8 bytes ][ အနောက်ပိုင်း 8 bytes ]",)),
-        "Input byte layout": (7, ("[11][22][33][44]           [32][45][54][67]",)),
-        "Password layout": (6, ("[ owner ရဲ့ နောက်ဆုံး 8 bytes ][ _secretKey 8 bytes ]",)),
-    }
-    for label, (rows, expected_lines) in fixtures.items():
-        code = page.locator(f'pre[aria-label="{label} block"] code')
+    from collections import Counter
+
+    diagrams = page.locator('.text-block[data-wrap="diagram"]')
+    expect(diagrams).to_have_count(13)
+    for block in diagrams.all():
+        code = block.locator("code")
         expect(code).to_be_visible()
-        expect(code).to_have_css("white-space", "pre")
-        lines = code.text_content().removesuffix("\n").splitlines()
-        assert len(lines) == rows, (label, len(lines), rows)
-        assert all(line in lines for line in expected_lines), (label, expected_lines)
-        dimensions = code.evaluate("el => ({height: el.getBoundingClientRect().height, lineHeight: parseFloat(getComputedStyle(el).lineHeight)})")
-        assert abs(dimensions["height"] - rows * dimensions["lineHeight"]) <= 1, (label, dimensions)
+        expect(code).to_have_css("white-space", "normal")
+        source = code.get_attribute("data-copy-source")
+        visible = code.inner_text()
+        words = lambda text: Counter(re.findall(r"[\w]+", text))
+        assert words(visible) == words(source), block.locator("pre").get_attribute("aria-label")
+        assert block.locator("pre").evaluate("el => el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1")
+        assert code.locator("span").evaluate_all(
+            "elements => elements.every(el => el.checkVisibility({contentVisibilityAuto: true}) && "
+            "getComputedStyle(el).fontSize === getComputedStyle(el.closest('code')).fontSize)"
+        ), "All diagram content must be visible at the established text size"
+
+    architecture = page.locator('pre[aria-label="Architecture block"]')
+    expect(architecture.locator('.diagram-box[aria-label="Setup"]')).to_have_count(1)
+    expect(architecture.locator('.diagram-box[aria-label="Vault"]')).to_have_count(1)
+    expect(architecture.locator('.diagram-reference[data-target="Vault"]')).to_contain_text("TARGET")
+    expect(architecture.locator(".diagram-link")).to_have_count(2)
+    geometry = architecture.evaluate("""pre => {
+      const intro = pre.querySelector('.diagram-intro').getBoundingClientRect();
+      const boxes = [...pre.querySelectorAll('.diagram-box')];
+      const links = [...pre.querySelectorAll('.diagram-link')];
+      return links.map((link, index) => {
+        const bounds = link.getBoundingClientRect();
+        const from = index ? boxes[index - 1].getBoundingClientRect() : intro;
+        const to = boxes[index].getBoundingClientRect();
+        const style = getComputedStyle(link), arrow = getComputedStyle(link, '::after');
+        return {gapBefore: bounds.top - from.bottom, gapAfter: to.top - bounds.bottom,
+          x: bounds.left, left: to.left, right: to.right,
+          line: style.borderLeftWidth, arrow: arrow.borderRightWidth, transform: arrow.transform};
+      });
+    }""")
+    for link in geometry:
+        assert abs(link["gapBefore"]) <= 1 and abs(link["gapAfter"]) <= 1, link
+        assert link["left"] < link["x"] < link["right"], link
+        assert link["line"] == "1px" and link["arrow"] == "1px" and link["transform"] != "none", link
+    reference_geometry = architecture.evaluate("""pre => {
+      const setup = pre.querySelector('.diagram-box[aria-label="Setup"]');
+      const reference = setup.querySelector('.diagram-reference');
+      const label = reference.querySelector('.diagram-reference-label');
+      const text = document.createRange();
+      text.selectNodeContents(label.firstChild);
+      const word = text.getBoundingClientRect();
+      const arm = reference.querySelector('.diagram-reference-arm');
+      const stem = setup.querySelector('.diagram-reference-stem');
+      const link = pre.querySelector('.diagram-reference-link');
+      const a = arm.getBoundingClientRect(), s = stem.getBoundingClientRect();
+      const l = link.getBoundingClientRect(), r = label.getBoundingClientRect();
+      const value = setup.textContent;
+      return {sourceOrder: value.indexOf('constructor()') < value.indexOf('TARGET') &&
+          value.indexOf('TARGET') < value.indexOf('isSolved()'),
+        label: reference.getAttribute('aria-label'), wordGap: a.left - word.right,
+        labelTop: r.top, labelBottom: r.bottom, armY: a.top,
+        turnX: a.right - s.right, turnY: a.top - s.top,
+        stemX: s.left - l.left, stemGap: l.top - s.bottom,
+        arm: getComputedStyle(arm).borderTopWidth, stem: getComputedStyle(stem).borderRightWidth};
+    }""")
+    assert reference_geometry["sourceOrder"] and reference_geometry["label"] == "TARGET points to Vault", reference_geometry
+    assert 0 <= reference_geometry["wordGap"] <= 8, reference_geometry
+    assert reference_geometry["labelTop"] < reference_geometry["armY"] < reference_geometry["labelBottom"], reference_geometry
+    for measurement in ("turnX", "turnY", "stemX", "stemGap"):
+        assert abs(reference_geometry[measurement]) <= 1, reference_geometry
+    assert reference_geometry["arm"] == reference_geometry["stem"] == "1px", reference_geometry
+
+    for selector, border in (
+        (".diagram-box", "borderTopWidth"), (".diagram-box", "borderRightWidth"),
+        (".diagram-box", "borderBottomWidth"), (".diagram-box", "borderLeftWidth"),
+        (".diagram-result > .diagram-number", "borderTopWidth"),
+        (".diagram-byte", "borderRightWidth"), (".diagram-halves", "borderTopWidth"),
+        (".diagram-half + .diagram-half", "borderLeftWidth"),
+    ):
+        values = diagrams.locator(selector).evaluate_all("(els, property) => els.map(el => getComputedStyle(el)[property])", border)
+        assert values and all(value == "1px" for value in values), (selector, values)
+    for selector, pseudo in ((".diagram-branch", "::before"), (".diagram-tree-node", "::before")):
+        assert diagrams.locator(selector).evaluate_all("(els, pseudo) => els.every(el => getComputedStyle(el, pseudo).borderTopWidth === '1px')", pseudo)
+
+    helper = page.locator('pre[aria-label="Helper call flow block"]')
+    expect(helper.locator(".diagram-step")).to_have_count(6)
+    assert helper.locator(".diagram-step:not(:last-child)").evaluate_all(
+        "els => els.every(el => getComputedStyle(el, '::before').borderLeftWidth === '1px')"
+    )
+    assert helper.locator(".diagram-step:not(:first-child)").evaluate_all(
+        "els => els.every(el => getComputedStyle(el, '::after').borderRightWidth === '1px' && "
+        "getComputedStyle(el, '::after').transform !== 'none')"
+    )
+    callers = page.locator('pre[aria-label="Contract call flow block"]')
+    expect(callers.locator(".diagram-tree > .diagram-tree-children > .diagram-tree-node")).to_have_count(1)
+    expect(callers.locator(".diagram-tree-node .diagram-tree-node")).to_have_count(2)
+    notes = callers.locator(".diagram-note").all_text_contents()
+    assert notes.count("Vault ထဲက msg.sender = Solver address") == 2
+    assert notes[-1] == "map.holder = Solver address"
+    for title, count in (("Mixed value", 1), ("Password assembly", 1), ("Password bitwise OR", 1), ("Bitwise OR", 3)):
+        expect(page.locator(f'pre[aria-label="{title} block"] .diagram-result')).to_have_count(count)
+    for title, count in (("Bytes32 to bytes16", 32), ("Bytes16 to bytes8", 16), ("64-bit shift", 32), ("Input byte layout", 16)):
+        expect(page.locator(f'pre[aria-label="{title} block"] .diagram-byte')).to_have_count(count)
     terminal = page.locator('pre[aria-label="Block number and timestamp block"] code').text_content()
     assert terminal.count("┌──(kali㉿kali)-[~]") == terminal.count("└─$") == 2
 
@@ -312,7 +381,9 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
     def assert_rendered_sources(target):
         actual = [
             text.removesuffix("\n")
-            for text in target.locator(".code-block code").all_text_contents()
+            for text in target.locator(".code-block code").evaluate_all(
+                "els => els.map(el => el.dataset.copySource ?? el.textContent)"
+            )
         ]
         assert actual == expected_sources, "Rendered listings do not match their Markdown source bytes"
 
@@ -386,7 +457,7 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
             })""")
             assert_copy_clear_of_source(page)
             for block in layout:
-                if block["mode"] != "flow":
+                if block["mode"] not in {"flow", "diagram"}:
                     assert block["copyBottom"] <= block["preTop"] + .1 or block["copyLeft"] >= block["preRight"] - .1, block
                 if block["compact"]:
                     assert block.get("toolbarBottom") is None, block
@@ -405,9 +476,10 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
                         assert block["copyHeight"] >= 44, block
                 elif block["compact"]:
                     assert block["wrap"] is None, block
-                    assert block["whiteSpace"] == ("pre-wrap" if block["mode"] == "flow" else "pre"), block
+                    expected_space = {"flow": "pre-wrap", "diagram": "normal", "preserve": "pre"}[block["mode"]]
+                    assert block["whiteSpace"] == expected_space, block
                     assert block["copyHeight"] >= 44, block
-                    if block["mode"] == "flow":
+                    if block["mode"] in {"flow", "diagram"}:
                         assert block["overflow"] <= 1, block
                 else:
                     assert block["wrap"] is None and block["whiteSpace"] == "pre", block
@@ -574,7 +646,7 @@ def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
                 overflowX: getComputedStyle(pre).overflowX,
                 tabIndex: pre.tabIndex,
                 hintVisible: !block.querySelector('.code-scroll-hint').hidden,
-                controlsClear: block.dataset.wrap === 'flow' || copyBox.left >= preBox.right};
+                controlsClear: ['flow', 'diagram'].includes(block.dataset.wrap) || copyBox.left >= preBox.right};
             })''')
             assert_copy_clear_of_source(page)
             for block in mobile_layout:
@@ -583,7 +655,7 @@ def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
                 assert block["verticalOverflow"] <= 1, (width, block)
                 assert block["copyWidth"] >= 44 and block["copyHeight"] >= 44, (width, block)
                 assert block["controlsClear"], (width, block)
-                if block["mode"] == "flow":
+                if block["mode"] in {"flow", "diagram"}:
                     assert block["overflow"] <= 1, (width, block)
                 else:
                     assert block["whiteSpace"] == "pre" and block["overflowX"] == "auto", (width, block)
@@ -604,7 +676,8 @@ def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
 
             for index, expected in enumerate(expected_text):
                 block = text_blocks.nth(index)
-                assert block.locator("code").text_content().removesuffix("\n") == expected
+                actual = block.locator("code").evaluate("el => el.dataset.copySource ?? el.textContent")
+                assert actual.removesuffix("\n") == expected
                 block.get_by_role("button", name="Copy code", exact=True).tap()
                 page.wait_for_function(
                     "async expected => await navigator.clipboard.readText() === expected", arg=expected
@@ -627,7 +700,20 @@ def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
                 assert lines[3] == shifted, (aria_label, lines)
                 assert lines[-1].endswith(": " + discarded), (aria_label, lines)
 
-            # Diagram rows are content, not padding: bound only extra chrome around them.
+            # These previously padded diagrams must actually be smaller, not merely scrollable.
+            for label, phone_max, wide_phone_max in (
+                ("Architecture", 630, 550), ("Helper call flow", 290, 235),
+                ("Contract call flow", 295, 240), ("Bitwise OR", 410, 395),
+                ("Mixed value", 175, 175), ("Password assembly", 175, 175),
+                ("Password bitwise OR", 175, 155), ("Bytes32 to bytes16", 310, 255),
+                ("Bytes16 to bytes8", 160, 145), ("64-bit shift", 225, 185),
+                ("Password halves", 150, 150), ("Input byte layout", 225, 225),
+                ("Password layout", 230, 230),
+            ):
+                block = next(item for item in mobile_layout if item["ariaLabel"] == label + " block")
+                assert block["overflow"] <= 1, (width, label, block)
+                assert block["height"] <= (phone_max if width == 320 else wide_phone_max), (width, label, block)
+            # The accepted fixed-width shift examples keep their existing row heights.
             for block in mobile_layout:
                 if block["mode"] == "preserve":
                     source = expected_text[block["index"]]
@@ -673,7 +759,7 @@ def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
         assert_no_horizontal_overflow(page)
     context.close()
     checks.append("All 28 mobile text and terminal listings copy exactly and retain 14px/20px typography")
-    checks.append("Diagram borders, arrows, branches, byte brackets, and separators stay intact with contained horizontal scrolling")
+    checks.append("All 13 responsive diagrams fit phones with visible borders, arrows, branches, byte boundaries and calculation rules")
     checks.append("Right and Left shift listings retain their accepted heights and fit 320px and 390px phones")
     checks.append("Flowing output and aligned diagrams remain readable at 200% text size without Copy covering source")
 

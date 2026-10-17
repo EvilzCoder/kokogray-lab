@@ -108,6 +108,10 @@ def only(nodes: list[Node], description: str) -> Node:
     return nodes[0]
 
 
+def copy_source(code: Node) -> str:
+    return code.attributes.get("data-copy-source", text_content(code))
+
+
 def trim_one_final_newline(value: str) -> str:
     """Permit Markdown/Pygments to differ only by the conventional final newline."""
 
@@ -237,7 +241,7 @@ class CodeBlockFormatterTests(unittest.TestCase):
         )
         code = only(descendants(pre, tag="code"), "code element")
         self.assertTrue(has_class(code, f"language-{language}"))
-        self.assertEqual(trim_one_final_newline(text_content(code)), trim_one_final_newline(source))
+        self.assertEqual(trim_one_final_newline(copy_source(code)), trim_one_final_newline(source))
 
     def test_on_config_installs_the_formatter(self):
         config = {"mdx_configs": {"codehilite": {"guess_lang": False}}}
@@ -349,6 +353,36 @@ class CodeBlockFormatterTests(unittest.TestCase):
                 self.assertNotIn("script", document.tags)
                 self.assertNotIn("<img", rendered)
                 self.assertNotIn("0xabcd", [text_content(span) for span in spans])
+
+    def test_responsive_diagram_copy_source_is_escaped_and_has_no_duplicate_listing(self):
+        source = '<img src=x onerror="alert(1)"> & literal\n│\n▼\n</code><script>alert(1)</script>'
+        rendered = highlight(source, TextLexer(), CodeBlockFormatter(
+            "language-text", layout="diagram", diagram="sequence", title="Steps",
+        ))
+        document = Document(rendered)
+        block = only(descendants(document.root, class_name="code-block"), "diagram block")
+        self.assert_block(block, language="text", source=source, wrap="diagram", title="Steps")
+        self.assertEqual(block.attributes["data-diagram"], "sequence")
+        self.assertEqual(len(descendants(block, class_name="diagram-step")), 2)
+        self.assertEqual(text_content(only(descendants(block, tag="code"), "diagram code")).count("<img"), 1)
+        self.assertNotIn("img", document.tags)
+        self.assertNotIn("script", document.tags)
+        self.assertNotIn("template", document.tags)
+        self.assertNotIn("textarea", document.tags)
+
+    def test_diagram_layout_is_opt_in_and_ignored_for_source_languages(self):
+        for language in ("solidity", "python", "console"):
+            source = "contract Vault {}"
+            rendered = render_markdown(f'```{{.{language} layout="diagram" diagram="boxes"}}\n{source}\n```')
+            block = only(descendants(Document(rendered).root, class_name="code-block"), "source block")
+            self.assert_block(block, language=language, source=source,
+                              wrap="preserve" if language == "console" else "auto")
+            self.assertNotIn("data-diagram", block.attributes)
+        for kind in (None, "unknown", '<img src=x onerror="alert(1)">'):
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
+                CodeBlockFormatter("language-text", layout="diagram", diagram=kind)
+        with self.assertRaises(ValueError):
+            render_markdown('```{.text layout="diagram" diagram="sequence"}\nfirst\nnot an arrow\nlast\n```')
 
     def test_default_terminal_blocks_preserve_lines_and_keep_toolbar(self):
         source = "$ cast call 0x1234 owner()\n0x1122334455667788"
@@ -534,7 +568,8 @@ class MagicVaultCodeBlockBuildTests(unittest.TestCase):
                     and fence.attribute("layout") == "flow"
                 )
                 compact_output = fence.language in TEXT_LANGUAGES or flow_output
-                expected_wrap = "flow" if flow_output else "preserve" if fence.language in FLOW_OUTPUT_LANGUAGES else "auto"
+                diagram = fence.language in TEXT_LANGUAGES and fence.attribute("layout") == "diagram"
+                expected_wrap = "diagram" if diagram else "flow" if flow_output else "preserve" if fence.language in FLOW_OUTPUT_LANGUAGES else "auto"
 
                 self.assertEqual(block.attributes.get("data-language"), fence.language)
                 self.assertEqual(block.attributes.get("data-wrap"), expected_wrap)
@@ -569,7 +604,7 @@ class MagicVaultCodeBlockBuildTests(unittest.TestCase):
                 code = only(descendants(pre, tag="code"), "code element")
                 self.assertTrue(has_class(code, f"language-{fence.language}"))
                 self.assertEqual(
-                    trim_one_final_newline(text_content(code)),
+                    trim_one_final_newline(copy_source(code)),
                     fence.source.strip("\n"),  # CodeHilite normalizes blank lines at fence boundaries.
                 )
 
@@ -633,25 +668,83 @@ class MagicVaultCodeBlockBuildTests(unittest.TestCase):
             f"{title} text fence",
         )
 
-    def test_aligned_diagrams_preserve_lines_instead_of_using_flow(self):
-        preserved = {
-            "Bytes32 to bytes16", "Mixed value", "Bytes16 to bytes8",
-            "Right shift", "Left shift", "Bitwise OR", "Architecture",
-            "64-bit shift", "Password halves", "Input byte layout",
-            "Password layout", "Password bitwise OR", "Helper call flow",
-            "Password assembly", "Contract call flow",
+    def test_only_supported_structural_diagrams_use_responsive_layout(self):
+        diagrams = {
+            "Bytes32 to bytes16": "bytes", "Mixed value": "calculation",
+            "Bytes16 to bytes8": "bytes", "Bitwise OR": "calculation",
+            "Architecture": "boxes", "64-bit shift": "bytes",
+            "Password halves": "halves", "Input byte layout": "halves",
+            "Password layout": "halves", "Password bitwise OR": "calculation",
+            "Helper call flow": "sequence", "Password assembly": "calculation",
+            "Contract call flow": "tree",
         }
-        text_fences = [fence for fence in self.fences if fence.language == "text"]
-        self.assertEqual(
-            {fence.attribute("title") for fence in text_fences if fence.attribute("layout") != "flow"},
-            preserved,
-        )
-        for fence in text_fences:
-            with self.subTest(title=fence.attribute("title")):
-                if fence.attribute("title") in preserved:
-                    self.assertIsNone(fence.attribute("layout"), "Diagram rows must not wrap out of alignment")
+        for fence in (fence for fence in self.fences if fence.language == "text"):
+            title = fence.attribute("title")
+            with self.subTest(title=title):
+                if title in diagrams:
+                    self.assertEqual(fence.attribute("layout"), "diagram")
+                    self.assertEqual(fence.attribute("diagram"), diagrams[title])
+                elif title in {"Right shift", "Left shift"}:
+                    self.assertIsNone(fence.attribute("layout"))
                 else:
                     self.assertEqual(fence.attribute("layout"), "flow")
+
+    def test_responsive_diagrams_show_every_word_value_and_relationship_once(self):
+        def words(text):
+            return Counter(re.findall(r"[\w]+", text))
+
+        def diagram(title):
+            index = next(index for index, fence in enumerate(self.fences) if fence.attribute("title") == title)
+            return self.blocks[index]
+
+        responsive = [block for block in self.blocks if block.attributes.get("data-wrap") == "diagram"]
+        self.assertEqual(len(responsive), 13)
+        for block in responsive:
+            code = only(descendants(block, tag="code"), "single visible diagram")
+            self.assertEqual(len(descendants(block, tag="pre")), 1)
+            self.assertEqual(len(descendants(block, class_name="diagram-content")), 1)
+            self.assertEqual(words(text_content(code)), words(copy_source(code)))
+            self.assertFalse(any(node.attributes.get("aria-hidden") == "true" and text_content(node).strip()
+                                 for node in descendants(code)))
+            self.assertFalse(any("hidden" in node.attributes for node in descendants(code)))
+
+        architecture = diagram("Architecture")
+        boxes = descendants(architecture, class_name="diagram-box")
+        self.assertEqual([box.attributes["aria-label"] for box in boxes], ["Setup", "Vault"])
+        reference = only(descendants(boxes[0], class_name="diagram-reference"), "TARGET connection")
+        self.assertEqual(reference.attributes["data-target"], "Vault")
+        self.assertEqual(reference.attributes["aria-label"], "TARGET points to Vault")
+        self.assertIn("TARGET", text_content(reference))
+        setup_text = text_content(boxes[0])
+        self.assertLess(setup_text.index("constructor()"), setup_text.index("TARGET"))
+        self.assertLess(setup_text.index("TARGET"), setup_text.index("isSolved()"))
+        route = only(descendants(boxes[0], class_name="diagram-reference-route"), "routed TARGET connection")
+        self.assertIn(reference, route.children)
+        self.assertIn("isSolved()", text_content(route))
+        self.assertEqual(len(descendants(reference, class_name="diagram-reference-arm")), 1)
+        self.assertEqual(len(descendants(route, class_name="diagram-reference-stem")), 1)
+        self.assertEqual(len(descendants(architecture, class_name="diagram-reference-link")), 1)
+        self.assertEqual(len(descendants(architecture, class_name="diagram-link")), 2)
+        self.assertEqual(len(descendants(architecture, class_name="diagram-branch")), 13)
+
+        helper_steps = descendants(diagram("Helper call flow"), class_name="diagram-step")
+        self.assertEqual(len(helper_steps), 6)
+        self.assertEqual([text_content(step) for step in helper_steps],
+                         self.one_text_fence("Helper call flow").source.strip("\n").splitlines()[::3])
+        callers = descendants(diagram("Contract call flow"), class_name="diagram-tree-node")
+        self.assertEqual(len(callers), 3)
+        self.assertEqual(len(descendants(callers[0], class_name="diagram-tree-node")), 2)
+        self.assertIn("Solver ထဲက msg.sender = Wallet address", text_content(callers[0]))
+        for call in callers[1:]:
+            self.assertIn("Vault ထဲက msg.sender = Solver address", text_content(call))
+        self.assertIn("map.holder = Solver address", text_content(callers[-1]))
+
+        for title, count in (("Mixed value", 1), ("Password bitwise OR", 1), ("Password assembly", 1), ("Bitwise OR", 3)):
+            self.assertEqual(len(descendants(diagram(title), class_name="diagram-result")), count)
+        for title, count in (("Bytes32 to bytes16", 32), ("Bytes16 to bytes8", 16), ("64-bit shift", 32), ("Input byte layout", 16)):
+            self.assertEqual(len(descendants(diagram(title), class_name="diagram-byte")), count)
+        for title in ("Password halves", "Password layout", "Input byte layout"):
+            self.assertEqual(len(descendants(diagram(title), class_name="diagram-half")), 2)
 
     def test_architecture_retains_both_boxes_branches_and_target_connector(self):
         source = self.one_text_fence("Architecture").source

@@ -177,7 +177,10 @@
     button.setAttribute("aria-label", "Copy code");
     button.title = "Copy code";
     button.textContent = "Copy";
-    button.addEventListener("click", () => copy($("code", block).textContent.replace(/\n$/, ""), "Code copied"));
+    button.addEventListener("click", () => {
+      const code = $("code", block);
+      copy((code.dataset.copySource ?? code.textContent).replace(/\n$/, ""), "Code copied");
+    });
     actions.append(button);
   });
   updateCodeBlocks();

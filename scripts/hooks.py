@@ -20,11 +20,12 @@ class CodeBlockFormatter(HtmlFormatter):
         self.code_filename = self.filename
         self.filename = ""
         self.plain_text = self.language in {"text", "txt", "plaintext"}
-        self.flow_text = self.plain_text and options.get("layout") == "flow"
-        self.text_title = str(options.get("title", "")) if self.plain_text else ""
         self.preserve_lines = self.language in {
             "text", "txt", "plaintext", "console", "shell-session", "pycon",
         }
+        self.flow_text = self.preserve_lines and options.get("layout") == "flow"
+        self.compact_output = self.plain_text or self.flow_text
+        self.text_title = str(options.get("title", "")) if self.compact_output else ""
         try:
             self.language_label = get_lexer_by_name(self.language).name
         except ClassNotFound:
@@ -40,7 +41,7 @@ class CodeBlockFormatter(HtmlFormatter):
         label = escape(self.language_label)
         kind = "block" if self.preserve_lines else "source code"
         region = escape(f"{self.text_title or self.code_filename or self.language_label} {kind}", quote=True)
-        if self.plain_text:
+        if self.compact_output:
             if filename:
                 yield 0, f'<div class="text-caption"><span class="code-filename">{filename}</span></div>'
             yield 0, '<div class="code-actions"></div>'
@@ -53,13 +54,16 @@ class CodeBlockFormatter(HtmlFormatter):
                 yield 0, '<span class="code-scroll-hint" hidden aria-hidden="true">Scroll horizontally &rarr;</span>'
             yield 0, '</div><div class="code-actions"></div></div>'
         yield 0, f'<pre tabindex="0" role="group" aria-label="{region}"><code class="language-{language}">'
-        yield from source
+        for kind, line in source:
+            if self.plain_text and self.flow_text:
+                line = re.sub(r"\b0x[0-9a-fA-F]{16,}\b", r'<span class="text-value">\g<0></span>', line)
+            yield kind, line
         yield 0, '</code></pre>'
-        if self.plain_text or not self.preserve_lines:
+        if self.compact_output or not self.preserve_lines:
             yield 0, '<div class="code-scroll-hint" hidden aria-hidden="true">Scroll horizontally to read &rarr;</div>'
 
     def _wrap_div(self, inner):
-        classes = escape(f"{self.cssclass} code-block{' text-block' if self.plain_text else ''}", quote=True)
+        classes = escape(f"{self.cssclass} code-block{' text-block' if self.compact_output else ''}", quote=True)
         language = escape(self.language, quote=True)
         wrap = "flow" if self.flow_text else "preserve" if self.preserve_lines else "auto"
         yield 0, f'<div class="{classes}" data-language="{language}" data-wrap="{wrap}">'

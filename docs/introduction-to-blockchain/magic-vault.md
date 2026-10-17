@@ -203,13 +203,11 @@ passphrase = bytes32(
 );
 ```
 passphrase ဆိုတာ bytes32 type ရှိတဲ့ private variable တခုဖြစ်ပါတယ်။ ဒီ code က block.timestamp ကို hash လုပ်တာ မဟုတ်ပါဘူး။ လက်ရှိ block ရဲ့ Unix Timestamp ကို block number လို့ ယူပြီး `blockhash()` ထဲ ထည့်ပေးထားတာ ဖြစ်ပါတယ်။
-```console
-┌──(kali㉿kali)-[~]
-└─$ cast block  latest --field number --rpc-url "http://154.57.164.69:37795/rpc"
+```{.console layout="flow" title="Block number and timestamp"}
+$ export ETH_RPC_URL="http://154.57.164.69:37795/rpc"
+$ cast block latest -f number
 338
-
-┌──(kali㉿kali)-[~]
-└─$ cast block  latest --field timestamp --rpc-url "http://154.57.164.69:37795/rpc"
+$ cast block latest -f timestamp
 1791971800
 ```
 block.timestamp ရဲ့ type က uint256 ဖြစ်ပါတယ်။ အပေါ်က ဥပမာအတိုင်း timestamp 1791971800 ကို blockhash() ထဲ ထည့်ပေးရင် block number 1,791,971,800 ရဲ့ hash ကို ရှာမှာပါ။ လက်ရှိ block number က 338 ပဲ ရှိသေးတဲ့အတွက် အဲ့ block က မရောက်သေးပါဘူး။
@@ -297,9 +295,8 @@ _key1 က _generateKey function ကို အသုံးပြုပါတယ�
 
 _key2 ကလည်း _generateKey ကို အသုံးပြုပါတယ်။ _reductor ရဲ့ တန်ဖိုးကို အမြဲ 2 အဖြစ် ထားပါတယ်။ ပြီးတော့ ရလာတဲ့ တန်ဖိုး ကို uint128 ပြောင်းပါတယ်။ သို့သော် _generateKey function ရဲ့ တန်ဖိုးက uint256 ဖြစ်တဲ့ အတွက် uint128 အဖြစ် cast လုပ်တဲ့အခါ 256-bit ထဲကနေ အရှေ့ဆုံး 128-bit ကို truncate လုပ်လိုက်ပါတယ်။
 
-```{.text layout="flow"}
+```{.text layout="flow" title="Modulo"}
 y = x mod 2^{128}
-
 y = x ကို 2^{128} နဲ့ စားလို့ ရမဲ့ အကြွင်း
 ```
 
@@ -309,31 +306,26 @@ _secret ကို တွက်ထုတ်ဖို့ ပထမ bytes32 passphr
 
 ![alt text](image-1.png)
 
-```{.text layout="flow"}
- XOR ရဲ့ သဘောတရား က
-
+```{.text layout="flow" title="XOR"}
+XOR ရဲ့ သဘောတရား က
 နေရာတူ bit ၂ ခု မတူရင် 1 ဖြစ်ပြီး
 နေရာတူ bit ၂ ခု တူညီရင် 0 ဖြစ်ပါတယ်
-
 ```
 
 
 ထို့နောက် ရလာတဲ့ uint256 value ကို bytes32 အဖြစ် ပြောင်းပါတယ်။ bytes32 တန်ဖိုးကို bytes16 အဖြစ် cast လုပ်လိုက်တဲ့အခါ အရှေ့ဆုံး 16 bytes ကို ယူပြီး အနောက်ဆုံး 16 bytes ကို ဖြတ်ချပါတယ်။ [00] နဲ့ အစားထိုးတာ မဟုတ်ပါဘူး။
 
-```{.text title="Bytes32 to bytes16"}
-ဥပမာ passphrase နဲ့ _key1 ကို XOR လုပ်ပြီး ရလာတဲ့ bytes32 က
-
+```{.text layout="flow" title="Bytes32 to bytes16"}
+passphrase ^ _key1 → bytes32
 0x11223344556677889900aabbccddeeffffeeddccbbaa00998877665544332211
-
-အရှေ့ဆုံး 16 bytes — ယူမဲ့ အပိုင်း
-[11][22][33][44][55][66][77][88]
-[99][00][aa][bb][cc][dd][ee][ff]
-
-အနောက်ဆုံး 16 bytes — ဖြတ်ချမဲ့ အပိုင်း
-[ff][ee][dd][cc][bb][aa][00][99]
-[88][77][66][55][44][33][22][11]
-
-bytes16 result : 0x11223344556677889900aabbccddeeff
+အရှေ့ဆုံး 16 bytes → ယူမယ်:
+11 22 33 44 55 66 77 88
+99 00 aa bb cc dd ee ff
+အနောက်ဆုံး 16 bytes → ဖြတ်ချမယ်:
+ff ee dd cc bb aa 00 99
+88 77 66 55 44 33 22 11
+bytes16 result:
+0x11223344556677889900aabbccddeeff
 ```
 
 ရလာတဲ့ bytes16 ကို uint128 ပြောင်းတဲ့အခါ size တူတဲ့အတွက် bit တွေ မပြောင်းပါဘူး။ ဒါပေမဲ့ ဒီနေရာမှာ _key2 နဲ့ XOR ထပ်လုပ်ထားတာကို မမေ့ရပါဘူး။ အဲ့ XOR ကြောင့် တန်ဖိုး ပြောင်းနိုင်ပါတယ်။ နောက်ထပ် uint128 cast ကတော့ uint128 ဖြစ်ပြီးသားတန်ဖိုးကို ထပ် cast လုပ်တာဖြစ်လို့ တန်ဖိုးမပြောင်းပါဘူး။
@@ -348,20 +340,20 @@ bytes8 _secret = bytes8(bytes16(mixed));
 
 ဒီ code က မူလ expression အရှည်ကြီးကို ဖတ်ရလွယ်အောင် ခွဲရေးထားတာပါ။ ဥပမာ အောက်က တန်ဖိုးတွေနဲ့ တွက်ကြည့်ပါမယ်။
 
-```text
-firstHalf : 0x11223344556677889900aabbccddeeff
-_key2     : 0x01010101010101010000000000000000
-            ----------------------------------
-mixed     : 0x10233245546776899900aabbccddeeff
+```{.text layout="flow" title="Mixed value"}
+firstHalf: 0x11223344556677889900aabbccddeeff
+_key2: 0x01010101010101010000000000000000
+mixed: 0x10233245546776899900aabbccddeeff
 ```
 
 mixed ကို bytes16 ပြောင်းပြီး bytes8 ထပ်ပြောင်းတဲ့အခါ အရှေ့ဆုံး 8 bytes ကိုပဲ ယူပါတယ်။
 
-```text
-[10][23][32][45][54][67][76][89] --- < ယူမဲ့ အပိုင်း >
-[99][00][aa][bb][cc][dd][ee][ff] --- < ဖြတ်ချမဲ့ အပိုင်း >
-
-bytes8 result : 0x1023324554677689
+```{.text layout="flow" title="Bytes16 to bytes8"}
+ယူမဲ့ အပိုင်း:
+10 23 32 45 54 67 76 89
+ဖြတ်ချမဲ့ အပိုင်း:
+99 00 aa bb cc dd ee ff
+bytes8: 0x1023324554677689
 ```
 
 ဒါဆိုရင် ဒီဥပမာအတွက် _secret တန်ဖိုးရပါပြီ။ အောက်က shift ဥပမာမှာလည်း အဲ့ တန်ဖိုးကိုပဲ ဆက်သုံးပါမယ်။
@@ -398,75 +390,38 @@ return (_secret >> 32 | _secret << 16);
 
 ရလာတဲ့ left နဲ့ right value တွေကို OR မယ် ဆိုရင် အဖြေက ဒီလိုရပါတယ်။ bitwise OR ရဲ့ သဘောတရားက နေရာတူ bit နှစ်ခုကို နှိုင်းယှဉ်ပြီး တစ်ခုခုက 1 ဖြစ်ရင် 1 ထုတ်ပေးတယ်။
 
-```{.text title="Bitwise OR"}
-right = 00 00 00 00 10 23 32 45
-left  = 32 45 54 67 76 89 00 00
-        -----------------------
-OR    = 32 45 54 67 76 AB 32 45
-
-
-0x10 | 0x76
-Binary ပြောင်းကြည့်ရင်—
-
-
-0x10 = 0001 0000
-0x76 = 0111 0110
-       ---------
-OR   = 0111 0110 = 0x76
+```{.text layout="flow" title="Bitwise OR"}
+right: 0x0000000010233245
+left: 0x3245546776890000
+OR: 0x3245546776ab3245
+0x10 | 0x76 → Binary:
+0001 0000 | 0111 0110
+= 0111 0110 = 0x76
 0x10 ထဲက 1 bit က 0x76 ထဲမှာ ရှိပြီးသားဖြစ်လို့ ရလဒ်က 0x76 ပဲဖြစ်ပါတယ်။
-
-0x23 | 0x89
-
-0x23 = 0010 0011
-0x89 = 1000 1001
-       ---------
-OR   = 1010 1011 = 0xAB
-ဒါကြောင့် နောက်ဆုံးရလဒ်က
-
-
-0x3245546776ab3245
+0x23 | 0x89 → Binary:
+0010 0011 | 1000 1001
+= 1010 1011 = 0xAB
 ```
 
 ### Architecture overview
 
-```{.text title="Architecture"}
-             Setup ကို deploy လုပ်သူ
-                       │
-                       │ 1 ETH နဲ့ deploy
-                       ▼
-┌─────────────────────────────────────────────┐
-│                 Setup                       │
-│                                             │
-│  constructor()                              │
-│  ├── msg.value == 1 ether ဖြစ်ရမယ်           │
-│  └── new Vault() နဲ့ Vault အသစ်ဖန်တီး        │
-│                                             │
-│  TARGET ────────────────────────────────────┼─────┐
-│  ဖန်တီးထားတဲ့ Vault ကို ရည်ညွှန်းထားတယ်      │     │
-│                                             │     │
-│  isSolved()                                 │     │
-│  └── Vault ရဲ့ holder ပြောင်းသွားပြီလား စစ်  │     │
-└─────────────────────────────────────────────┘     │
-                                                   ▼
-┌──────────────────────────────────────────────────────┐
-│                       Vault                          │
-│                                                      │
-│  သိမ်းထားတဲ့ Data                                   │
-│  ├── map.holder   → လက်ရှိ Map ကိုင်ဆောင်သူ           │
-│  ├── owner        → Vault ကို ဖန်တီးသူ                │
-│  ├── passphrase   → secret တွက်ရာမှာ သုံးတဲ့တန်ဖိုး    │
-│  ├── nonce        → key တွက်တိုင်း တိုးတဲ့ counter     │
-│  └── isUnlocked   → သော့ဖွင့်ပြီးပြီလား                │
-│                                                      │
-│  အပြင်က ခေါ်နိုင်တဲ့ Function များ                    │
-│  ├── mapHolder()                                     │
-│  ├── unlock(bytes16 password)                         │
-│  └── claimContent()                                  │
-│                                                      │
-│  အတွင်းပိုင်း Helper Function များ                   │
-│  ├── _magicPassword()                                │
-│  └── _generateKey(reductor)                           │
-└──────────────────────────────────────────────────────┘
+```{.text layout="flow" title="Architecture"}
+Setup ကို deploy လုပ်သူ → 1 ETH → Setup
+Setup constructor():
+msg.value == 1 ether ဖြစ်ရမယ်
+new Vault() → Vault အသစ်ဖန်တီး
+TARGET → ဖန်တီးထားတဲ့ Vault
+isSolved() → Vault ရဲ့ holder ပြောင်းသွားပြီလား စစ်
+Vault သိမ်းထားတဲ့ Data:
+map.holder → လက်ရှိ Map ကိုင်ဆောင်သူ
+owner → Vault ကို ဖန်တီးသူ
+passphrase → secret တွက်ရာမှာ သုံးတဲ့တန်ဖိုး
+nonce → key တွက်တိုင်း တိုးတဲ့ counter
+isUnlocked → သော့ဖွင့်ပြီးပြီလား
+အပြင်က ခေါ်နိုင်တဲ့ Function များ:
+mapHolder(), unlock(bytes16 password), claimContent()
+အတွင်းပိုင်း Helper Function များ:
+_magicPassword(), _generateKey(reductor)
 ```
 
 ## Exploiting the vulnerabilities
@@ -495,23 +450,22 @@ uint128 _secretKey = uint128(bytes16(_magicPassword()) >> 64);
 
 ဒီမှာ _magicPassword() က ရလာတဲ့ bytes8 ကို bytes16 အဖြစ် အရင် cast လုပ်ပါတယ်။ bytes type ကို အငယ်ကနေ အကြီး ပြောင်းတဲ့အချိန်မှာ အနောက်ဘက်မှာ [00] တွေ ထပ်ဖြည့်ပေးပါတယ်။
 
-```text
-ဥပမာ _magicPassword() က ပြန်ပေးတဲ့ တန်ဖိုးက
-
-bytes8  : 0x3245546776ab3245
-bytes16 : 0x3245546776ab32450000000000000000
+```{.text layout="flow" title="Bytes8 to bytes16"}
+_magicPassword() ဥပမာ:
+bytes8: 0x3245546776ab3245
+bytes16: 0x3245546776ab32450000000000000000
 ```
 
 ပြီးတော့ >> 64 ဆိုပြီး ညာဘက်ကို 64-bit ရွှေ့ပါတယ်။ 8-bit က 1 byte ဖြစ်တဲ့အတွက် 64-bit ဆိုရင် 8 bytes ဖြစ်ပါတယ်။
 
-```{.text title="64-bit shift"}
-မူလ:
-[32][45][54][67][76][ab][32][45][00][00][00][00][00][00][00][00]
-
+```{.text layout="flow" title="64-bit shift"}
+မူလ bytes16:
+32 45 54 67 76 ab 32 45
+00 00 00 00 00 00 00 00
 ညာဘက် 8 bytes ရွှေ့ပြီး:
-[00][00][00][00][00][00][00][00][32][45][54][67][76][ab][32][45]
-
-bytes16 : 0x00000000000000003245546776ab3245
+00 00 00 00 00 00 00 00
+32 45 54 67 76 ab 32 45
+bytes16: 0x00000000000000003245546776ab3245
 ```
 
 နောက်ဆုံး uint128 အဖြစ် cast လုပ်လိုက်တော့ အဲ့ bit တွေကိုပဲ integer တန်ဖိုးအဖြစ် ယူလိုက်တာဖြစ်ပါတယ်။ ဒါကြောင့် _secretKey ကို uint128 နဲ့ သိမ်းထားပေမဲ့ တကယ်တန်ဖိုးရှိတဲ့ အပိုင်းက အနောက်ဆုံး 64-bit ထဲမှာပဲ ရှိပါတယ်။
@@ -524,12 +478,10 @@ _password က bytes16 ဖြစ်တဲ့အတွက် 128-bit ရှိပ�
 
 ဒီတော့ password ကို အရှေ့ပိုင်း 8 bytes နဲ့ အနောက်ပိုင်း 8 bytes ဆိုပြီး နှစ်ပိုင်းခွဲကြည့်ပါမယ်။
 
-```text
-                 bytes16 _password
-
-[ အရှေ့ပိုင်း 8 bytes ][ အနောက်ပိုင်း 8 bytes ]
-        upper                  lower
-        64-bit                 64-bit
+```{.text layout="flow" title="Password halves"}
+bytes16 _password:
+upper → အရှေ့ပိုင်း 8 bytes (64-bit)
+lower → အနောက်ပိုင်း 8 bytes (64-bit)
 ```
 
 ### Case 1
@@ -542,10 +494,9 @@ require(_input != _secretKey, "Case 1 failed");
 
 ဒီမှာ _secretKey ကို သိရုံနဲ့ password အဖြစ် တန်းထည့်ပေးလို့ မရပါဘူး။ တူသွားရင် Case 1 failed ဆိုပြီး transaction က revert ဖြစ်သွားမှာပါ။
 
-```text
-_secretKey : 0x00000000000000003245546776ab3245
-_input     : 0x00000000000000003245546776ab3245
-
+```{.text layout="flow" title="Case 1 comparison"}
+_secretKey: 0x00000000000000003245546776ab3245
+_input: 0x00000000000000003245546776ab3245
 တူနေတဲ့အတွက် Case 1 failed ဖြစ်ပါမယ်။
 ```
 
@@ -561,16 +512,14 @@ require(uint64(_input) == _secretKey, "Case 2 failed");
 
 uint128 ကနေ uint64 အဖြစ် ပြောင်းလိုက်တဲ့အချိန်မှာ အရှေ့ပိုင်း 64-bit ကို ဖြတ်ချပြီး အနောက်ဆုံး 64-bit ကိုပဲ ယူပါတယ်။
 
-```{.text title="Input byte layout"}
-_input : 0x11223344556677883245546776ab3245
-
-အရှေ့ပိုင်း                အနောက်ပိုင်း
-[11][22][33][44]           [32][45][54][67]
-[55][66][77][88]           [76][ab][32][45]
-   ဖြတ်ချမယ်                  ယူမယ်
-
-uint64(_input) : 0x3245546776ab3245
-_secretKey    : 0x3245546776ab3245
+```{.text layout="flow" title="Input byte layout"}
+_input: 0x11223344556677883245546776ab3245
+အရှေ့ပိုင်း → ဖြတ်ချမယ်:
+11 22 33 44 55 66 77 88
+အနောက်ပိုင်း → ယူမယ်:
+32 45 54 67 76 ab 32 45
+uint64(_input) = _secretKey
+= 0x3245546776ab3245
 ```
 
 ဒီလိုဆိုရင် password တခုလုံးကို ကြည့်တဲ့အချိန်မှာ _secretKey နဲ့ မတူပါဘူး။ ဒါပေမဲ့ အနောက်ဆုံး 8 bytes ကိုပဲ ယူကြည့်တဲ့အချိန်မှာတော့ _secretKey နဲ့ တူပါတယ်။ ဒါကြောင့် Case 1 နဲ့ Case 2 နှစ်ခုလုံးကို ကျော်လို့ရပါတယ်။
@@ -593,33 +542,28 @@ require(
 
 အပေါ်က _secret တွက်တဲ့နေရာမှာလိုပဲ fixed-size bytes type ကို အငယ်ပြောင်းတဲ့အချိန်မှာ အရှေ့ပိုင်းကို ယူပြီး အနောက်ပိုင်းကို ဖြတ်ချပါတယ်။ ဒါကြောင့် ဒီ Case 3 က password ရဲ့ အရှေ့ပိုင်း 8 bytes ကို စစ်တာဖြစ်ပါတယ်။
 
-```text
-_password         : 0x11223344556677883245546776ab3245
-bytes8(_password) : 0x1122334455667788
-
-uint64(bytes8(_password)) : 0x1122334455667788
+```{.text layout="flow" title="Password first half"}
+_password: 0x11223344556677883245546776ab3245
+bytes8(_password): 0x1122334455667788
+uint64(bytes8(_password)): 0x1122334455667788
 ```
 
 ညာဘက်က uint64(uint160(owner)) ကိုလည်း ကြည့်ပါမယ်။ owner က address type ဖြစ်တဲ့အတွက် 20 bytes ၊ တနည်းအားဖြင့် 160-bit ရှိပါတယ်။ uint160 ပြောင်းလိုက်တော့ အဲ့ address ကို integer အဖြစ် ယူလိုက်တာပါ။ ပြီးမှ uint64 ပြောင်းတဲ့အတွက် အနောက်ဆုံး 8 bytes ပဲ ကျန်ပါမယ်။
 
-```{.text layout="flow"}
-ဥပမာ owner address က
-
+```{.text layout="flow" title="Owner address"}
+ဥပမာ owner address:
 0xaabbccddeeff0011223344551122334455667788
-
-uint64(uint160(owner)) : 0x1122334455667788
+uint64(uint160(owner)): 0x1122334455667788
 ```
 
 ဒီမှာ owner က ဘယ်သူလဲ ဆိုတာ ပြန်ကြည့်ပါမယ်။ အပေါ်က constructor() မှာ ရှင်းထားတဲ့အတိုင်း Vault ကို new Vault() နဲ့ ဖန်တီးတာက Setup Contract ဖြစ်လို့ owner က Setup Contract ရဲ့ address ဖြစ်ပါတယ်။ Vault ရဲ့ address ကိုယ်တိုင် မဟုတ်ပါဘူး။
 
 ```{.text layout="flow" title="Constructor values"}
-Vault constructor() ထဲမှာ
-
-msg.sender    = Setup Contract address
-address(this) = Vault Contract address
-
-owner         = Setup Contract address
-map.holder    = Vault Contract address
+Vault constructor() ထဲမှာ:
+msg.sender = owner
+= Setup Contract address
+address(this) = map.holder
+= Vault Contract address
 ```
 
 ဒါကြောင့် Case 3 ကို ကျော်ဖို့ password ရဲ့ အရှေ့ဆုံး 8 bytes ကို owner address ရဲ့ အနောက်ဆုံး 8 bytes နဲ့ တူအောင် ထည့်ပေးရမှာဖြစ်ပါတယ်။
@@ -628,17 +572,13 @@ map.holder    = Vault Contract address
 
 condition သုံးခုကို ပြန်ပေါင်းကြည့်လိုက်ရင် ကျွန်တော်တို့ ထည့်ပေးရမဲ့ password ပုံစံက ဒီလိုဖြစ်ပါတယ်။
 
-```{.text title="Password layout"}
-                  bytes16 _password
-
-[ owner ရဲ့ နောက်ဆုံး 8 bytes ][ _secretKey 8 bytes ]
-
-ဥပမာ
-
-owner အပိုင်း : 0x1122334455667788
+```{.text layout="flow" title="Password layout"}
+bytes16 _password (8 bytes စီ ဆက်ထား):
+အရှေ့: owner ရဲ့ နောက်ဆုံး 8 bytes
+အနောက်: _secretKey 8 bytes
+ဥပမာ owner အပိုင်း: 0x1122334455667788
 secret အပိုင်း: 0x3245546776ab3245
-
-_password    : 0x11223344556677883245546776ab3245
+_password: 0x11223344556677883245546776ab3245
 ```
 
 အပေါ်က တန်ဖိုးတွေက နားလည်လွယ်အောင် ပေးထားတဲ့ ဥပမာတွေဖြစ်ပါတယ်။ Challenge မှာ တကယ်ထည့်ရမဲ့ password ကတော့ လက်ရှိ owner နဲ့ unlock() run မဲ့ block ထဲမှာ တွက်ရတဲ့ _secretKey ပေါ် မူတည်ပါတယ်။
@@ -653,11 +593,10 @@ bytes16 password = bytes16(upper | lower);
 
 owner ရဲ့ နောက်ဆုံး 8 bytes ကို uint128 အဖြစ် အရင်ပြောင်းပြီး ဘယ်ဘက် 64-bit ရွှေ့ပါတယ်။ uint64 အဖြစ်နဲ့ပဲ 64-bit ရွှေ့လိုက်ရင် bit တွေအကုန် ဘောင်အပြင်ရောက်ပြီး ပျောက်သွားမှာဖြစ်လို့ uint128 ကို အရင်ပြောင်းပေးရတာပါ။
 
-```text
-upper : 0x11223344556677880000000000000000
-lower : 0x00000000000000003245546776ab3245
-        ----------------------------------
-OR    : 0x11223344556677883245546776ab3245
+```{.text layout="flow" title="Password bitwise OR"}
+upper: 0x11223344556677880000000000000000
+lower: 0x00000000000000003245546776ab3245
+OR: 0x11223344556677883245546776ab3245
 ```
 
 ဒီမှာ owner ရဲ့ နောက်ဆုံး 8 bytes က zero မဖြစ်ဖို့လည်း လိုပါတယ်။ zero ဖြစ်နေခဲ့ရင် Case 3 ကြောင့် password ရဲ့ အရှေ့ပိုင်းကလည်း zero ပဲ ဖြစ်ရပါမယ်။ အဲ့ဒီအချိန်မှာ Case 2 ကို ဖြည့်လိုက်တာနဲ့ _input က _secretKey နဲ့ တူသွားပြီး Case 1 ကို ကျော်လို့ မရတော့ပါဘူး။
@@ -677,10 +616,9 @@ uint128 _key2 = uint128(_generateKey(2));
 
 _key1 တွက်တဲ့နေရာမှာလည်း အစီအစဉ်ကို သတိထားရပါမယ်။ _generateKey() ရဲ့ return တန်ဖိုးကို % 2 + 1 လုပ်တာ မဟုတ်ဘဲ block.timestamp % 2 + 1 ကို အရင်တွက်ပြီး ရလာတဲ့ 1 သို့မဟုတ် 2 ကို _reductor အဖြစ် ထည့်ပေးတာဖြစ်ပါတယ်။
 
-```{.text layout="flow"}
+```{.text layout="flow" title="Timestamp parity"}
 block.timestamp က စုံကိန်းဆိုရင်
 _reductor = 0 + 1 = 1
-
 block.timestamp က မကိန်းဆိုရင်
 _reductor = 1 + 1 = 2
 ```
@@ -704,23 +642,13 @@ bytes8 magicPassword = (secret >> 32) | (secret << 16);
 
 ဒါကြောင့် helper contract တခုထဲမှာ key ကို တွက်ပြီး အဲ့ transaction တခုတည်းအတွင်းမှာပဲ Vault ရဲ့ unlock() ကို ဆက်ခေါ်ပေးတဲ့နည်းကို သုံးပါမယ်။ ဒီလိုဆို helper contract နဲ့ Vault နှစ်ခုလုံးက block.number ၊ block.timestamp နဲ့ အရင် block တွေရဲ့ blockhash တွေကို တူတူပဲ မြင်ရမှာပါ။ nonce ကိုတော့ Vault ဆီက ဖတ်ပြီး helper ဘက်မှာ local variable နဲ့ တွက်ရမှာဖြစ်ပါတယ်။
 
-```{.text title="Helper call flow"}
-Wallet က helper contract ကို ခေါ်မယ်
-                  │
-                  ▼
-Vault ရဲ့ owner နဲ့ လက်ရှိ nonce ကို ဖတ်မယ်
-                  │
-                  ▼
-_key1 ၊ _key2 နဲ့ _secretKey ကို တွက်မယ်
-                  │
-                  ▼
-owner အပိုင်းနဲ့ secret အပိုင်း ပေါင်းပြီး password လုပ်မယ်
-                  │
-                  ▼
-Vault.unlock(password) ကို ခေါ်မယ်
-                  │
-                  ▼
-Vault.claimContent() ကို ခေါ်မယ်
+```{.text layout="flow" title="Helper call flow"}
+1. Wallet → helper contract
+2. Vault ရဲ့ owner နဲ့ လက်ရှိ nonce ဖတ်မယ်
+3. _key1, _key2, _secretKey တွက်မယ်
+4. owner အပိုင်းနဲ့ secret အပိုင်း ပေါင်းပြီး password လုပ်မယ်
+5. Vault.unlock(password) ခေါ်မယ်
+6. Vault.claimContent() ခေါ်မယ်
 ```
 
 unlock() က condition သုံးခုလုံး ကျော်သွားရင် isUnlocked ကို true ပြောင်းပေးပါတယ်။ ဒါပေမဲ့ ဒီနေရာမှာပဲ ရပ်လိုက်ရင် Challenge က solve မဖြစ်သေးပါဘူး။ Setup ရဲ့ isSolved() က isUnlocked ကို စစ်တာ မဟုတ်ဘဲ map.holder ပြောင်းသွားလား ဆိုတာကို စစ်တာဖြစ်ပါတယ်။
@@ -896,17 +824,13 @@ nonce = nonce + 1;
 Vault က _generateKey() တခါခေါ်ပြီးတိုင်း nonce ကို 1 တိုးတာကြောင့် Solver ဘက်မှာလည်း key1 တွက်ပြီးတာနဲ့ local nonce ကို 1 တိုးပေးရပါတယ်။ ဒါမှ key2 တွက်တဲ့နေရာမှာ သုံးတဲ့ nonce က Vault နဲ့ တူမှာဖြစ်ပါတယ်။
 
 ```{.text layout="flow" title="Nonce calculation"}
-Vault ဆီက ဖတ်လာတဲ့ nonce = n
-
-Solver တွက်တဲ့အချိန်
-    key1 အတွက် nonce = n
-    key2 အတွက် nonce = n + 1
-    Vault ရဲ့ nonce  = n ပဲ ရှိသေးတယ်
-
-Vault.unlock() ထဲမှာ ပြန်တွက်တဲ့အချိန်
-    _key1 အတွက် nonce = n
-    _key2 အတွက် nonce = n + 1
-    နှစ်ခါတွက်ပြီး nonce = n + 2
+Vault ဆီက nonce = n
+Solver တွက်တဲ့အချိန်:
+key1 → n; key2 → n + 1
+Vault nonce = n ပဲရှိသေးတယ်
+Vault.unlock() ပြန်တွက်ချိန်:
+_key1 → n; _key2 → n + 1
+နှစ်ခါတွက်ပြီး nonce = n + 2
 ```
 
 key2 အောက်က ဒုတိယ nonce = nonce + 1 ကတော့ Vault ရဲ့ အစီအစဉ်အတိုင်း လိုက်ရေးထားတာပါ။ အဲ့နောက်မှာ local nonce ကို ထပ်မသုံးတော့တဲ့အတွက် password တွက်ဖို့ ဒီဒုတိယ increment က မလိုအပ်ပါဘူး။ key1 နဲ့ key2 ကြားက increment ကတော့ လိုပါတယ်။
@@ -945,11 +869,10 @@ ownerLow က owner address ရဲ့ နောက်ဆုံး 8 bytes ပါ�
 
 solve() အပေါ်က comment ထဲမှာ ရေးထားတဲ့ goal ကို ဒီနေရာမှာ ပြန်ကြည့်လို့ရပါတယ်။ အဲ့ထဲက hex တန်ဖိုးတွေက ပုံစံမြင်ရဖို့ ပေးထားတဲ့ ဥပမာတွေပါ။ code ကတော့ owner နဲ့ _secretKey ကို တွက်ပြီး password ကို တည်ဆောက်တာဖြစ်ပါတယ်။
 
-```text
-front      = AABBCCDDEEFF0011 0000000000000000
+```{.text layout="flow" title="Password assembly"}
+front = AABBCCDDEEFF0011 0000000000000000
 _secretKey = 0000000000000000 1122334455667788
-             ---------------------------------
-password   = AABBCCDDEEFF0011 1122334455667788
+password = AABBCCDDEEFF0011 1122334455667788
 ```
 
 ဒီပုံစံဆိုရင် condition သုံးခုကို ဘယ်လိုကျော်လဲဆိုတာ တခါတည်း တွေ့ရပါတယ်။
@@ -971,29 +894,25 @@ password ရပြီဆိုတာနဲ့ Vault ရဲ့ unlock() ကို
 
 unlock() အောင်မြင်ရင် isUnlocked က true ဖြစ်သွားပြီး နောက်တကြောင်းက claimContent() ကို ဆက်ခေါ်ပါတယ်။ ဒီ call နှစ်ခုလုံးမှာ Vault က မြင်တဲ့ msg.sender က Solver Contract ရဲ့ address ဖြစ်ပါတယ်။ Wallet က solve() ကို စခေါ်ခဲ့ပေမဲ့ Vault ကို တိုက်ရိုက်ခေါ်တာက Solver ဖြစ်နေလို့ပါ။
 
-```{.text title="Contract call flow"}
-Wallet
-  │
-  └── Solver.solve(Vault address)
-        │   Solver ထဲက msg.sender = Wallet address
-        │
-        ├── Vault.unlock(password)
-        │     Vault ထဲက msg.sender = Solver address
-        │
-        └── Vault.claimContent()
-              Vault ထဲက msg.sender = Solver address
-              map.holder = Solver address
+```{.text layout="flow" title="Contract call flow"}
+Wallet → Solver.solve(Vault address)
+Solver: msg.sender = Wallet address
+Solver → Vault (အစဉ်လိုက်):
+1. unlock(password)
+2. claimContent()
+Vault: msg.sender = Solver address (call နှစ်ခုလုံး)
+map.holder = Solver address
 ```
 
 ဒီနှစ်ခုကို transaction တခုတည်းမှာ ဆက်ခေါ်ထားပြီး revert ကို ဖမ်းထားတာလည်း မရှိပါဘူး။ unlock() မှာ revert ဖြစ်ရင် claimContent() အထိ မရောက်တော့ပါဘူး။ claimContent() မှာ revert ဖြစ်ခဲ့ရင်လည်း အရင် unlock() က ပြောင်းခဲ့တဲ့ state တွေနဲ့ Solver ထဲမှာ သိမ်းခဲ့တဲ့ တန်ဖိုးတွေအပါအဝင် ဒီ solve() transaction ထဲက အပြောင်းအလဲတွေ ပြန်ပျက်သွားမှာပါ။
 
 transaction အောင်မြင်ပြီးတဲ့အခါ မျှော်လင့်ရတဲ့ အခြေအနေက ဒီလိုဖြစ်ပါတယ်။ ဒါက တကယ့် RPC output မဟုတ်ဘဲ စစ်ကြည့်ရမဲ့ တန်ဖိုးတွေကို ဖော်ပြထားတာပါ။
 
-```{.text layout="flow"}
+```{.text layout="flow" title="Expected state"}
 Vault.isUnlocked() → true
-Vault.mapHolder()  → Solver Contract address
-Vault.nonce()      → solve() စခေါ်ချိန်က nonce + 2
-Setup.isSolved()   → true
+Vault.mapHolder() → Solver Contract address
+Vault.nonce() → solve() စခေါ်ချိန်က nonce + 2
+Setup.isSolved() → true
 ```
 
 ဒါကြောင့် Solver ကို deploy လုပ်ပြီး solve() ကို Vault address နဲ့ ခေါ်ပေးရင် key တွက်တာ၊ password တည်ဆောက်တာ၊ unlock လုပ်တာနဲ့ holder ပြောင်းတာကို transaction တခုတည်းမှာ ဆက်လုပ်ပေးနိုင်ပါတယ်။ နောက်ဆုံး Setup ရဲ့ isSolved() ကို စစ်တဲ့အချိန် map.holder က မူလ Vault address မဟုတ်တော့တဲ့အတွက် Challenge ရဲ့ condition ကို ပြည့်မီသွားတာဖြစ်ပါတယ်။

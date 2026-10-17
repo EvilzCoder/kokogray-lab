@@ -216,6 +216,37 @@ def magic_vault_fences():
     return fences
 
 
+def assert_copy_clear_of_source(page):
+    overlaps = page.locator('.text-block[data-wrap="flow"]').evaluate_all(r'''blocks => {
+      const overlaps = [];
+      for (const [index, block] of blocks.entries()) {
+        const copy = block.querySelector('.code-copy');
+        if (!copy || !copy.getClientRects().length) continue;
+        const button = copy.getBoundingClientRect();
+        const walker = document.createTreeWalker(block.querySelector('code'), NodeFilter.SHOW_TEXT);
+        const range = document.createRange();
+        let node;
+        while ((node = walker.nextNode())) {
+          for (let offset = 0; offset < node.length; offset++) {
+            if (/\s/.test(node.data[offset])) continue;
+            range.setStart(node, offset);
+            range.setEnd(node, offset + 1);
+            if ([...range.getClientRects()].some(rect =>
+              rect.width > 0 && rect.height > 0 &&
+              rect.left < button.right - .5 && rect.right > button.left + .5 &&
+              rect.top < button.bottom - .5 && rect.bottom > button.top + .5
+            )) {
+              overlaps.push({index, label: block.querySelector('pre').getAttribute('aria-label'), offset});
+              break;
+            }
+          }
+        }
+      }
+      return overlaps;
+    }''')
+    assert not overlaps, f"Copy controls cover source characters: {overlaps}"
+
+
 def check_code_blocks(browser, base, origin, checks, errors, failures):
     context = browser.new_context(
         viewport={"width": 390, "height": 844}, has_touch=True, reduced_motion="reduce",
@@ -296,6 +327,7 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
               return {
                 language: block.dataset.language,
                 mode: block.dataset.wrap,
+                compact: block.classList.contains('text-block'),
                 toolbarBottom: toolbar?.getBoundingClientRect().bottom,
                 toolbarHeight: toolbar?.getBoundingClientRect().height,
                 hintInToolbar: toolbar?.contains(block.querySelector('.code-scroll-hint')),
@@ -315,9 +347,11 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
                 hintVisible: !block.querySelector('.code-scroll-hint').hidden
               };
             })""")
+            assert_copy_clear_of_source(page)
             for block in layout:
-                assert block["copyBottom"] <= block["preTop"] + .1 or block["copyLeft"] >= block["preRight"] - .1, block
-                if block["language"] == "text":
+                if block["mode"] != "flow":
+                    assert block["copyBottom"] <= block["preTop"] + .1 or block["copyLeft"] >= block["preRight"] - .1, block
+                if block["compact"]:
                     assert block.get("toolbarBottom") is None, block
                 else:
                     assert block["toolbarBottom"] <= block["preTop"] + .1, block
@@ -332,7 +366,7 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
                     if width < 640:
                         assert block["overflow"] <= 1, block
                         assert block["copyHeight"] >= 44, block
-                elif block["language"] == "text":
+                elif block["compact"]:
                     assert block["wrap"] is None, block
                     assert block["whiteSpace"] == ("pre-wrap" if block["mode"] == "flow" else "pre"), block
                     assert block["copyHeight"] >= 44, block
@@ -417,7 +451,7 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
     for width in (320, 390):
         static_page.set_viewport_size({"width": width, "height": 844})
         static_page.goto(article, wait_until="networkidle")
-        expect(static_page.locator(".code-toolbar")).to_have_count(34)
+        expect(static_page.locator(".code-toolbar")).to_have_count(33)
         expect(static_page.locator(".text-block .code-toolbar")).to_have_count(0)
         expect(static_page.locator(".code-actions button")).to_have_count(0)
         expect(static_page.locator(".code-block details, .code-block summary, .code-disclosure")).to_have_count(0)
@@ -428,6 +462,9 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
         preserved = static_page.locator('.code-block[data-wrap="preserve"]')
         expect(preserved.locator('.code-scroll-hint:visible')).to_have_count(preserved.count())
         expect(static_page.locator('.text-block[data-wrap="flow"] .code-scroll-hint:visible')).to_have_count(0)
+        assert static_page.locator('.text-block pre').evaluate_all(
+            "elements => elements.every(el => el.scrollWidth <= el.clientWidth + 1)"
+        ), "Static text and terminal examples must fit without JavaScript"
         for label in ("Right shift block", "Left shift block"):
             pre = static_page.locator(f'pre[aria-label="{label}"]')
             expect(pre).to_be_visible()
@@ -457,9 +494,9 @@ def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
     fences = magic_vault_fences()
     expected_text = [
         source for info, source in fences
-        if re.search(r"^text(?:\s|$)|(?:^|[\s{])\.text(?:\s|}|$)", info)
+        if re.search(r"^(?:text|console)(?:\s|$)|(?:^|[\s{])\.(?:text|console)(?:\s|}|$)", info)
     ]
-    assert len(expected_text) == 27
+    assert len(expected_text) == 28
     measurements = []
 
     for width in (320, 390):
@@ -469,7 +506,7 @@ def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
             page.evaluate("document.fonts.ready")
             page.locator(f".mobile-page-theme [data-set-theme='{theme}']").click()
             text_blocks = page.locator(".text-block")
-            expect(text_blocks).to_have_count(27)
+            expect(text_blocks).to_have_count(28)
             expect(page.locator(".text-block .code-toolbar")).to_have_count(0)
             expect(page.locator(".code-block details, .code-block summary, .code-disclosure")).to_have_count(0)
             expect(page.locator(".code-block pre:visible")).to_have_count(61)
@@ -484,16 +521,16 @@ def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
                 verticalOverflow: pre.scrollHeight - pre.clientHeight,
                 font: getComputedStyle(code).fontSize, lineHeight: getComputedStyle(code).lineHeight,
                 copyWidth: copyBox.width, copyHeight: copyBox.height,
-                controlsClear: copyBox.left >= preBox.right};
+                controlsClear: block.dataset.wrap === 'flow' || copyBox.left >= preBox.right};
             })''')
+            assert_copy_clear_of_source(page)
             for block in mobile_layout:
                 assert block["visible"], (width, block)
                 assert block["font"] == "14px" and block["lineHeight"] == "20px", (width, block)
                 assert block["verticalOverflow"] <= 1, (width, block)
                 assert block["copyWidth"] >= 44 and block["copyHeight"] >= 44, (width, block)
                 assert block["controlsClear"], (width, block)
-                if block["mode"] == "flow":
-                    assert block["overflow"] <= 1, (width, block)
+                assert block["overflow"] <= 1, (width, block)
 
             for index, expected in enumerate(expected_text):
                 block = text_blocks.nth(index)
@@ -520,16 +557,54 @@ def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
                 assert lines[3] == shifted, (aria_label, lines)
                 assert lines[-1].endswith(": " + discarded), (aria_label, lines)
 
+            # Burmese fallback fonts differ by platform; allow a few extra wrapped rows.
+            for label, phone_height, wide_phone_height in (
+                ("Block number and timestamp", 185, 165),
+                ("Bytes32 to bytes16", 345, 285),
+                ("Mixed value", 145, 145),
+                ("Bitwise OR", 305, 285),
+                ("Architecture", 545, 485),
+                ("Password layout", 265, 225),
+                ("Helper call flow", 285, 225),
+                ("Nonce calculation", 205, 205),
+                ("Contract call flow", 265, 245),
+            ):
+                block = next(item for item in mobile_layout if item["ariaLabel"] == label + " block")
+                maximum = phone_height if width == 320 else wide_phone_height
+                assert block["height"] <= maximum, (width, label, block)
+
             measurements.append({"width": width, "theme": theme, "blocks": mobile_layout})
             assert_no_horizontal_overflow(page)
-            right_shift = page.locator('pre[aria-label="Right shift block"]')
-            right_shift.scroll_into_view_if_needed()
-            page.screenshot(path=str(RESULTS / f"text-examples-{width}-{theme}.png"))
+            for label, name in (
+                ("Right shift", "text-examples"),
+                ("Architecture", "architecture"),
+                ("Block number and timestamp", "terminal"),
+            ):
+                page.locator(f'pre[aria-label="{label} block"]').scroll_into_view_if_needed()
+                page.screenshot(path=str(RESULTS / f"{name}-{width}-{theme}.png"))
             assert_no_horizontal_overflow(page)
     (RESULTS / "text-size-report.json").write_text(json.dumps(measurements, indent=2), encoding="utf-8")
+
+    for width in (320, 390):
+        page.set_viewport_size({"width": width, "height": 844})
+        page.goto(article, wait_until="networkidle")
+        page.add_style_tag(content=".text-block pre { font-size: 28px; line-height: 40px; }")
+        page.evaluate("document.fonts.ready")
+        assert_copy_clear_of_source(page)
+        assert page.locator('.text-block[data-wrap="flow"] pre').evaluate_all(
+            "elements => elements.every(el => el.scrollWidth <= el.clientWidth + 1 && "
+            "el.scrollHeight <= el.clientHeight + 1)"
+        ), "Flowing output must remain readable at 200% text size"
+        assert page.locator('.text-block pre').evaluate_all(
+            "elements => elements.every(el => el.checkVisibility({contentVisibilityAuto: true}) && "
+            "el.scrollHeight <= el.clientHeight + 1)"
+        )
+        assert_no_horizontal_overflow(page)
     context.close()
-    checks.append("All mobile text listings are fully visible, copy exactly, and retain 14px/20px source typography")
-    checks.append("Right and Left shift listings fit 320px and 390px phones without internal or page overflow")
+    checks.append("All 28 mobile text and terminal listings fit, copy exactly, and retain 14px/20px typography")
+    checks.append("Architecture, terminal, byte examples, and call flows meet compact phone-size bounds without clipping")
+    checks.append("Right and Left shift listings retain their accepted heights and fit 320px and 390px phones")
+    checks.append("Flowing output remains readable at 200% text size without Copy covering any source characters")
 
 
 def main():

@@ -22,6 +22,7 @@ if str(ROOT) not in sys.path:
 
 from markdown import markdown
 from pygments import highlight
+from pygments.lexers import get_lexer_by_name
 from pygments.lexers.special import TextLexer
 from scripts.hooks import CodeBlockFormatter, on_config
 
@@ -32,6 +33,8 @@ FENCE_PATTERN = re.compile(
     re.MULTILINE | re.DOTALL,
 )
 ATTRIBUTE_PATTERN = r"(?:^|\s){name}\s*=\s*(?:\"(?P<double>[^\"]*)\"|'(?P<single>[^']*)'|(?P<bare>[^\s}}]+))"
+TEXT_LANGUAGES = {"text", "txt", "plaintext"}
+FLOW_OUTPUT_LANGUAGES = TEXT_LANGUAGES | {"console", "shell-session", "pycon"}
 
 
 @dataclass
@@ -180,16 +183,28 @@ class CodeBlockFormatterTests(unittest.TestCase):
         self.assertEqual(block.attributes.get("data-language"), language)
         self.assertEqual(block.attributes.get("data-wrap"), wrap)
 
-        plain_text = language in {"text", "txt", "plaintext"}
-        self.assertEqual(has_class(block, "text-block"), plain_text)
-        if plain_text:
-            self.assertEqual(descendants(block, class_name="code-toolbar"), [])
-            self.assertEqual(descendants(block, class_name="code-language"), [])
-            label_text = "Text"
+        plain_text = language in TEXT_LANGUAGES
+        flow_output = language in FLOW_OUTPUT_LANGUAGES and wrap == "flow"
+        compact_output = plain_text or flow_output
+        self.assertEqual(has_class(block, "text-block"), compact_output)
+
+        toolbars = descendants(block, class_name="code-toolbar")
+        captions = descendants(block, class_name="text-caption")
+        if compact_output:
+            self.assertEqual(toolbars, [])
+            if filename is not None:
+                only(captions, "compact output filename caption")
+            else:
+                self.assertEqual(captions, [])
+            label_text = "Text" if plain_text else get_lexer_by_name(language).name
+            if language in {"console", "shell-session"}:
+                label_text = "Terminal"
         else:
-            toolbar = only(descendants(block, class_name="code-toolbar"), "code toolbar")
+            self.assertEqual(captions, [])
+            toolbar = only(toolbars, "code toolbar")
             label = only(descendants(toolbar, class_name="code-label"), "code label")
             label_text = text_content(only(descendants(label, class_name="code-language"), "language label"))
+
         actions = only(descendants(block, class_name="code-actions"), "code actions")
         self.assertEqual(text_content(actions), "")
         self.assertEqual(descendants(actions), [])
@@ -203,7 +218,7 @@ class CodeBlockFormatterTests(unittest.TestCase):
         hint = only(descendants(block, class_name="code-scroll-hint"), "scroll hint")
         self.assertIn("hidden", hint.attributes)
         self.assertEqual(hint.attributes.get("aria-hidden"), "true")
-        if not plain_text:
+        if not compact_output:
             self.assertEqual(descendants(toolbar, class_name="code-scroll-hint"), [hint] if wrap == "preserve" else [])
 
         self.assertEqual(descendants(block, tag="details"), [])
@@ -218,7 +233,7 @@ class CodeBlockFormatterTests(unittest.TestCase):
         self.assertEqual(
             pre.attributes.get("aria-label"),
             f"{title or filename or label_text} "
-            f"{'block' if plain_text or wrap == 'preserve' else 'source code'}",
+            f"{'block' if compact_output or wrap == 'preserve' else 'source code'}",
         )
         code = only(descendants(pre, tag="code"), "code element")
         self.assertTrue(has_class(code, f"language-{language}"))
@@ -290,17 +305,98 @@ class CodeBlockFormatterTests(unittest.TestCase):
         block = only(descendants(Document(rendered).root, class_name="code-block"), "text block")
         self.assert_block(block, language="text", source=source, wrap="preserve")
 
-    def test_flow_layout_is_opt_in_and_only_applies_to_plain_text(self):
+    def test_flow_layout_is_opt_in_for_text_and_terminal_output_only(self):
         source = "value = 00 01 02 03\n\nresult = 10 11 12 13"
-        for language in ("text", "txt", "plaintext", "console", "solidity"):
+        for language in ("text", "txt", "plaintext", "console", "shell-session", "pycon"):
             with self.subTest(language=language):
                 rendered = render_markdown(f'```{{.{language} layout="flow"}}\n{source}\n```')
                 block = only(descendants(Document(rendered).root, class_name="code-block"), "code block")
-                expected = "auto" if language == "solidity" else "preserve" if language == "console" else "flow"
-                self.assert_block(block, language=language, source=source, wrap=expected)
+                self.assert_block(block, language=language, source=source, wrap="flow")
+                self.assertTrue(has_class(block, "text-block"))
+                self.assertEqual(descendants(block, class_name="code-toolbar"), [])
+
+        for language in ("solidity", "python"):
+            with self.subTest(source_language=language):
+                rendered = render_markdown(f'```{{.{language} layout="flow"}}\n{source}\n```')
+                block = only(descendants(Document(rendered).root, class_name="code-block"), "source block")
+                self.assert_block(block, language=language, source=source, wrap="auto")
+                self.assertFalse(has_class(block, "text-block"))
+
         rendered = render_markdown(f'```{{.text layout="unknown"}}\n{source}\n```')
         block = only(descendants(Document(rendered).root, class_name="code-block"), "text block")
         self.assert_block(block, language="text", source=source, wrap="preserve")
+
+    def test_long_hex_wrapping_is_scoped_and_keeps_escaped_source_exact(self):
+        value = "0x11223344556677889900aabbccddeeff"
+        source = f'<img src="{value}" onerror="alert(1)"> & 0xabcd\nresult: {value}'
+        for language, layout, wrap, count in (
+            ("text", "flow", "flow", 2),
+            ("txt", "flow", "flow", 2),
+            ("plaintext", "flow", "flow", 2),
+            ("text", None, "preserve", 0),
+            ("console", "flow", "flow", 0),
+            ("solidity", "flow", "auto", 0),
+        ):
+            with self.subTest(language=language, layout=layout):
+                info = f'.{language}' + (' layout="flow"' if layout else '')
+                rendered = render_markdown(f"```{{{info}}}\n{source}\n```")
+                document = Document(rendered)
+                block = only(descendants(document.root, class_name="code-block"), "code block")
+                self.assert_block(block, language=language, source=source, wrap=wrap)
+                spans = descendants(block, class_name="text-value")
+                self.assertEqual([text_content(span) for span in spans], [value] * count)
+                self.assertNotIn("img", document.tags)
+                self.assertNotIn("script", document.tags)
+                self.assertNotIn("<img", rendered)
+                self.assertNotIn("0xabcd", [text_content(span) for span in spans])
+
+    def test_default_terminal_blocks_preserve_lines_and_keep_toolbar(self):
+        source = "$ cast call 0x1234 owner()\n0x1122334455667788"
+        for language in ("console", "shell-session", "pycon"):
+            with self.subTest(language=language):
+                rendered = render_markdown(f"```{language}\n{source}\n```")
+                block = only(descendants(Document(rendered).root, class_name="code-block"), "terminal block")
+                self.assert_block(block, language=language, source=source, wrap="preserve")
+                self.assertFalse(has_class(block, "text-block"))
+                self.assertEqual(len(descendants(block, class_name="code-toolbar")), 1)
+
+    def test_flow_terminal_caption_escapes_filename_and_title_without_copying_metadata(self):
+        filename = '<terminal>&.log'
+        title = '<strong>query</strong>'
+        source = '$ cast call target nonce()\n7'
+        rendered = highlight(
+            source,
+            TextLexer(),
+            CodeBlockFormatter(
+                "language-console",
+                layout="flow",
+                filename=filename,
+                title=title,
+            ),
+        )
+        document = Document(rendered)
+        block = only(descendants(document.root, class_name="code-block"), "flow terminal block")
+        self.assert_block(
+            block,
+            language="console",
+            source=source,
+            wrap="flow",
+            filename=filename,
+            title=title,
+        )
+        self.assertEqual(
+            text_content(only(descendants(block, class_name="text-caption"), "terminal filename caption")),
+            filename,
+        )
+        self.assertEqual(descendants(block, class_name="code-language"), [])
+        self.assertEqual(descendants(block, class_name="code-toolbar"), [])
+        self.assertNotIn("terminal", document.tags)
+        self.assertNotIn("strong", document.tags)
+        self.assertNotIn("<terminal", rendered)
+        self.assertNotIn("<strong", rendered)
+        self.assertIn("&lt;terminal", rendered)
+        self.assertIn("&lt;strong", rendered)
+        self.assertNotIn(title, text_content(block))
 
     def test_text_titles_are_escaped_and_never_enter_the_copyable_source(self):
         title = '<img src=x onerror="alert(1)">'
@@ -433,28 +529,42 @@ class MagicVaultCodeBlockBuildTests(unittest.TestCase):
 
         for index, (fence, block) in enumerate(zip(self.fences, self.blocks, strict=True), start=1):
             with self.subTest(block=index, language=fence.language):
-                self.assertEqual(block.attributes.get("data-language"), fence.language)
-                self.assertEqual(
-                    block.attributes.get("data-wrap"),
-                    "auto" if fence.language == "solidity" else "flow" if fence.attribute("layout") == "flow" else "preserve",
+                flow_output = (
+                    fence.language in FLOW_OUTPUT_LANGUAGES
+                    and fence.attribute("layout") == "flow"
                 )
-                if fence.language == "text":
-                    self.assertTrue(has_class(block, "text-block"))
-                    self.assertEqual(descendants(block, class_name="code-toolbar"), [])
+                compact_output = fence.language in TEXT_LANGUAGES or flow_output
+                expected_wrap = "flow" if flow_output else "preserve" if fence.language in FLOW_OUTPUT_LANGUAGES else "auto"
+
+                self.assertEqual(block.attributes.get("data-language"), fence.language)
+                self.assertEqual(block.attributes.get("data-wrap"), expected_wrap)
+                self.assertEqual(has_class(block, "text-block"), compact_output)
+                toolbars = descendants(block, class_name="code-toolbar")
+                if compact_output:
+                    self.assertEqual(toolbars, [])
                 else:
-                    toolbar = only(descendants(block, class_name="code-toolbar"), "code toolbar")
+                    toolbar = only(toolbars, "code toolbar")
                     self.assertEqual(len(descendants(toolbar, class_name="code-label")), 1)
+
+                if compact_output:
+                    if fence.attribute("filename"):
+                        only(descendants(block, class_name="text-caption"), "compact output filename caption")
+                    else:
+                        self.assertEqual(descendants(block, class_name="text-caption"), [])
+                else:
+                    self.assertEqual(descendants(block, class_name="text-caption"), [])
+
                 actions = only(descendants(block, class_name="code-actions"), "code actions")
                 self.assertEqual(text_content(actions), "")
                 self.assertEqual(descendants(actions), [])
                 hint = only(descendants(block, class_name="code-scroll-hint"), "scroll hint")
-                if fence.language != "text":
-                    self.assertEqual(descendants(toolbar, class_name="code-scroll-hint"), [hint] if fence.language == "console" else [])
+                if not compact_output:
+                    self.assertEqual(descendants(toolbar, class_name="code-scroll-hint"), [hint] if expected_wrap == "preserve" else [])
 
                 pre = only(descendants(block, tag="pre"), "code pre")
                 self.assertEqual(pre.attributes.get("role"), "group")
                 self.assertEqual(pre.attributes.get("tabindex"), "0")
-                suffix = " source code" if fence.language == "solidity" else " block"
+                suffix = " block" if compact_output or expected_wrap == "preserve" else " source code"
                 self.assertTrue(pre.attributes.get("aria-label", "").endswith(suffix))
                 code = only(descendants(pre, tag="code"), "code element")
                 self.assertTrue(has_class(code, f"language-{fence.language}"))
@@ -462,6 +572,9 @@ class MagicVaultCodeBlockBuildTests(unittest.TestCase):
                     trim_one_final_newline(text_content(code)),
                     fence.source.strip("\n"),  # CodeHilite normalizes blank lines at fence boundaries.
                 )
+
+        self.assertEqual(len(descendants(self.document.root, class_name="text-block")), 28)
+        self.assertEqual(len(descendants(self.document.root, class_name="code-toolbar")), 33)
 
     def test_source_copy_is_exact_article_body_without_front_matter(self):
         self.assertEqual(
@@ -514,13 +627,86 @@ class MagicVaultCodeBlockBuildTests(unittest.TestCase):
                 self.assertNotIn("→", fence.source)
                 self.assertNotIn("←", fence.source)
 
-    def test_only_independent_text_explanations_wrap(self):
+    def test_all_non_shift_text_examples_use_flow_without_hiding_content(self):
         text_fences = [fence for fence in self.fences if fence.language == "text"]
-        flow_indices = [index for index, fence in enumerate(text_fences) if fence.attribute("layout") == "flow"]
-        self.assertEqual(flow_indices, [0, 1, 6, 8, 17, 18, 21, 23, 26])
+        shifts = {"Right shift", "Left shift"}
+
         for fence in text_fences:
-            if any(marker in fence.source for marker in ("[", "│", "─", "---")):
-                self.assertIsNone(fence.attribute("layout"), "Byte columns and ASCII diagrams must preserve alignment")
+            with self.subTest(title=fence.attribute("title"), source=fence.source[:40]):
+                if fence.attribute("title") in shifts:
+                    self.assertIsNone(fence.attribute("layout"), "Shift diagrams must preserve alignment")
+                else:
+                    self.assertEqual(fence.attribute("layout"), "flow")
+
+        self.assertEqual(
+            {fence.attribute("title") for fence in text_fences if fence.attribute("layout") != "flow"},
+            shifts,
+        )
+
+    def test_compacted_examples_preserve_architecture_hex_terminal_nonce_and_caller_details(self):
+        def one_text_fence(title: str) -> Fence:
+            return only(
+                [fence for fence in self.fences if fence.attribute("title") == title],
+                f"{title} text fence",
+            )
+
+        architecture = one_text_fence("Architecture")
+        self.assertEqual(architecture.attribute("layout"), "flow")
+        for field in ("map.holder", "owner", "passphrase", "nonce", "isUnlocked"):
+            self.assertIn(field, architecture.source)
+        for function in ("mapHolder()", "unlock(bytes16 password)", "claimContent()", "_magicPassword()", "_generateKey(reductor)"):
+            self.assertIn(function, architecture.source)
+
+        bytes16 = one_text_fence("Bytes32 to bytes16")
+        self.assertEqual(bytes16.attribute("layout"), "flow")
+        self.assertIn("0x11223344556677889900aabbccddeeff", bytes16.source)
+        self.assertIn("0x11223344556677889900aabbccddeeffffeeddccbbaa00998877665544332211", bytes16.source)
+        self.assertLess(bytes16.source.index("အရှေ့ဆုံး 16 bytes"), bytes16.source.index("အနောက်ဆုံး 16 bytes"))
+
+        terminal = only([fence for fence in self.fences if fence.language == "console"], "terminal transcript")
+        self.assertEqual(terminal.attribute("layout"), "flow")
+        self.assertIn('export ETH_RPC_URL="http://154.57.164.69:37795/rpc"', terminal.source)
+        self.assertIn("cast block latest -f number", terminal.source)
+        self.assertIn("cast block latest -f timestamp", terminal.source)
+        self.assertIn("338", terminal.source)
+        self.assertIn("1791971800", terminal.source)
+
+        nonce = one_text_fence("Nonce calculation")
+        self.assertEqual(nonce.attribute("layout"), "flow")
+        self.assertLess(nonce.source.index("key1 → n"), nonce.source.index("key2 → n + 1"))
+        self.assertLess(nonce.source.index("_key1 → n"), nonce.source.index("_key2 → n + 1"))
+        self.assertIn("နှစ်ခါတွက်ပြီး nonce = n + 2", nonce.source)
+
+        callers = one_text_fence("Contract call flow")
+        self.assertEqual(callers.attribute("layout"), "flow")
+        self.assertLess(callers.source.index("Solver.solve(Vault address)"), callers.source.index("1. unlock(password)"))
+        self.assertLess(callers.source.index("1. unlock(password)"), callers.source.index("2. claimContent()"))
+        self.assertEqual(callers.source.count("Vault: msg.sender = Solver address (call နှစ်ခုလုံး)"), 1)
+        self.assertIn("map.holder = Solver address", callers.source)
+
+    def test_flow_text_value_spans_preserve_exact_long_hex_values(self):
+        expected_hex_values = {
+            "0x11223344556677889900aabbccddeeffffeeddccbbaa00998877665544332211",
+            "0xaabbccddeeff0011223344551122334455667788",
+        }
+        spans = descendants(self.document.root, tag="span", class_name="text-value")
+        values = {text_content(span) for span in spans}
+        self.assertTrue(expected_hex_values <= values)
+
+        for value in expected_hex_values:
+            with self.subTest(value=value):
+                span = only([candidate for candidate in spans if text_content(candidate) == value], "long hex span")
+                block = next(
+                    block
+                    for block in self.blocks
+                    if span in descendants(block, tag="span", class_name="text-value")
+                )
+                self.assertEqual(block.attributes.get("data-wrap"), "flow")
+                self.assertEqual(descendants(span, tag="span"), [])
+                self.assertEqual(text_content(span), value)
+                self.assertNotIn(chr(0x200B), text_content(span))
+                self.assertNotIn(chr(0xAD), text_content(span))
+                self.assertNotIn("&", text_content(span))
 
     def test_solidity_syntax_classes_and_fence_attributes_do_not_leak_into_html(self):
         for css_class in ("kt", "nv", "ni"):

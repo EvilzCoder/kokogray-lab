@@ -96,7 +96,7 @@ Plain text preserves columns by default for ASCII diagrams and byte layouts. Use
 ```
 ````
 
-Keep byte rows short and put discarded bytes on separate lines rather than beside a wide diagram. All examples remain readable without JavaScript and print in full. Avoid squeezing diagrams into tiny type or clipping them inside vertical scrollboxes.
+Keep diagram borders, connecting arrows, tree branches, calculation separators, and byte brackets: they convey relationships and are part of the example. Remove only unnecessary empty rows or outer indentation to reduce space; do not flatten diagrams into lists. Preserve aligned diagrams as `text` without `layout="flow"`, allowing horizontal scrolling inside the block when needed instead of breaking their columns. All examples remain readable without JavaScript and print in full. Avoid squeezing diagrams into tiny type or clipping them inside vertical scrollboxes.
 
 ## Test
 

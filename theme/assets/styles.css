@@ -395,6 +395,7 @@ body:has(.search-dialog[open]) { overflow: hidden; }
   .page-content pre code { width: auto; white-space: pre-wrap; }
   .codehilite, .codehilite pre { overflow: visible; }
   .text-block { display: block; }
+  .text-block[data-wrap="preserve"] pre code { width: max-content; white-space: pre; overflow-wrap: normal; }
   .text-block[data-wrap="flow"] pre code::before { content: none !important; }
   .text-block[data-wrap="flow"] > .text-caption { min-height: 0; padding: 10px 16px; }
   .page-content h2, .page-content h3 { break-after: avoid; }

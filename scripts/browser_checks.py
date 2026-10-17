@@ -247,6 +247,42 @@ def assert_copy_clear_of_source(page):
     assert not overlaps, f"Copy controls cover source characters: {overlaps}"
 
 
+def assert_diagram_structure(page):
+    fixtures = {
+        "Architecture": (31, ("┌" + "─" * 45 + "┐", "└" + "─" * 45 + "┘     │",
+                               "┌" + "─" * 54 + "┐", "└" + "─" * 54 + "┘",
+                               "│  TARGET " + "─" * 36 + "┼─────┐",
+                               "                                                   ▼")),
+        "Mixed value": (4, ("            ----------------------------------",)),
+        "Bitwise OR": (18, ("        -----------------------", "       ---------",
+                            "0x10 = 0001 0000", "0x76 = 0111 0110",
+                            "0x23 = 0010 0011", "0x89 = 1000 1001")),
+        "Password bitwise OR": (4, ("        ----------------------------------",)),
+        "Password assembly": (4, ("             ---------------------------------",)),
+        "Helper call flow": (16, ("                  │", "                  ▼")),
+        "Contract call flow": (11, ("  │", "  └── Solver.solve(Vault address)",
+                                    "        ├── Vault.unlock(password)", "        │",
+                                    "        └── Vault.claimContent()")),
+        "Bytes32 to bytes16": (9, ("[11][22][33][44][55][66][77][88]", "[88][77][66][55][44][33][22][11]")),
+        "Bytes16 to bytes8": (3, ("[10][23][32][45][54][67][76][89] --- < ယူမဲ့ အပိုင်း >",)),
+        "64-bit shift": (5, ("[32][45][54][67][76][ab][32][45][00][00][00][00][00][00][00][00]",)),
+        "Password halves": (4, ("[ အရှေ့ပိုင်း 8 bytes ][ အနောက်ပိုင်း 8 bytes ]",)),
+        "Input byte layout": (7, ("[11][22][33][44]           [32][45][54][67]",)),
+        "Password layout": (6, ("[ owner ရဲ့ နောက်ဆုံး 8 bytes ][ _secretKey 8 bytes ]",)),
+    }
+    for label, (rows, expected_lines) in fixtures.items():
+        code = page.locator(f'pre[aria-label="{label} block"] code')
+        expect(code).to_be_visible()
+        expect(code).to_have_css("white-space", "pre")
+        lines = code.text_content().removesuffix("\n").splitlines()
+        assert len(lines) == rows, (label, len(lines), rows)
+        assert all(line in lines for line in expected_lines), (label, expected_lines)
+        dimensions = code.evaluate("el => ({height: el.getBoundingClientRect().height, lineHeight: parseFloat(getComputedStyle(el).lineHeight)})")
+        assert abs(dimensions["height"] - rows * dimensions["lineHeight"]) <= 1, (label, dimensions)
+    terminal = page.locator('pre[aria-label="Block number and timestamp block"] code').text_content()
+    assert terminal.count("┌──(kali㉿kali)-[~]") == terminal.count("└─$") == 2
+
+
 def check_code_blocks(browser, base, origin, checks, errors, failures):
     context = browser.new_context(
         viewport={"width": 390, "height": 844}, has_touch=True, reduced_motion="reduce",
@@ -303,6 +339,7 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
             expect(page.locator(".code-block details, .code-block summary, .code-disclosure")).to_have_count(0)
             assert_all_pre_visible(page)
             assert_rendered_sources(page)
+            assert_diagram_structure(page)
 
             for filename, expected_source in expected_contracts.items():
                 block = page.locator(".code-block").filter(has=page.locator(".code-filename", has_text=filename))
@@ -432,7 +469,10 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
 
     expect(page.locator(".code-block details, .code-block summary, .code-disclosure")).to_have_count(0)
     assert_all_pre_visible(page)
+    page.set_viewport_size({"width": 794, "height": 1123})
     page.emulate_media(media="print")
+    assert_diagram_structure(page)
+    assert_no_horizontal_overflow(page)
     expect(page.locator(".code-block pre")).to_have_count(61)
     assert page.locator(".code-block pre").evaluate_all(
         "elements => elements.every(element => element.checkVisibility({contentVisibilityAuto: true}) && "
@@ -459,12 +499,17 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
         expect(static_page.locator("[data-toggle-theme]")).not_to_be_visible()
         assert_all_pre_visible(static_page)
         assert_rendered_sources(static_page)
+        assert_diagram_structure(static_page)
         preserved = static_page.locator('.code-block[data-wrap="preserve"]')
         expect(preserved.locator('.code-scroll-hint:visible')).to_have_count(preserved.count())
         expect(static_page.locator('.text-block[data-wrap="flow"] .code-scroll-hint:visible')).to_have_count(0)
-        assert static_page.locator('.text-block pre').evaluate_all(
+        assert static_page.locator('.text-block[data-wrap="flow"] pre').evaluate_all(
             "elements => elements.every(el => el.scrollWidth <= el.clientWidth + 1)"
-        ), "Static text and terminal examples must fit without JavaScript"
+        ), "Flowing text and terminal examples must fit without JavaScript"
+        assert static_page.locator('.text-block[data-wrap="preserve"] pre').evaluate_all(
+            "elements => elements.every(el => getComputedStyle(el).overflowX === 'auto' && "
+            "getComputedStyle(el.querySelector('code')).whiteSpace === 'pre')"
+        ), "Static diagrams must keep aligned lines and a contained horizontal scroller"
         for label in ("Right shift block", "Left shift block"):
             pre = static_page.locator(f'pre[aria-label="{label}"]')
             expect(pre).to_be_visible()
@@ -473,9 +518,13 @@ def check_code_blocks(browser, base, origin, checks, errors, failures):
         assert static_page.locator('.code-block[data-language="solidity"] pre').evaluate_all(
             "elements => elements.every(el => el.scrollWidth <= el.clientWidth + 1)"
         )
+    static_page.set_viewport_size({"width": 794, "height": 1123})
     static_page.goto(article, wait_until="networkidle")
     static_page.emulate_media(media="print")
     assert_all_pre_visible(static_page)
+    assert_rendered_sources(static_page)
+    assert_diagram_structure(static_page)
+    assert_no_horizontal_overflow(static_page)
     expect(static_page.locator(".code-scroll-hint:visible")).to_have_count(0)
     no_js.close()
     checks.append("All 61 listings remain directly readable and printable without JavaScript")
@@ -521,6 +570,10 @@ def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
                 verticalOverflow: pre.scrollHeight - pre.clientHeight,
                 font: getComputedStyle(code).fontSize, lineHeight: getComputedStyle(code).lineHeight,
                 copyWidth: copyBox.width, copyHeight: copyBox.height,
+                whiteSpace: getComputedStyle(code).whiteSpace,
+                overflowX: getComputedStyle(pre).overflowX,
+                tabIndex: pre.tabIndex,
+                hintVisible: !block.querySelector('.code-scroll-hint').hidden,
                 controlsClear: block.dataset.wrap === 'flow' || copyBox.left >= preBox.right};
             })''')
             assert_copy_clear_of_source(page)
@@ -530,7 +583,24 @@ def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
                 assert block["verticalOverflow"] <= 1, (width, block)
                 assert block["copyWidth"] >= 44 and block["copyHeight"] >= 44, (width, block)
                 assert block["controlsClear"], (width, block)
-                assert block["overflow"] <= 1, (width, block)
+                if block["mode"] == "flow":
+                    assert block["overflow"] <= 1, (width, block)
+                else:
+                    assert block["whiteSpace"] == "pre" and block["overflowX"] == "auto", (width, block)
+                    assert block["hintVisible"] == (block["overflow"] > 1), (width, block)
+                    assert block["tabIndex"] == (0 if block["overflow"] > 1 else -1), (width, block)
+                    if block["overflow"] > 1:
+                        pre = text_blocks.nth(block["index"]).locator("pre")
+                        pre.evaluate("el => el.scrollLeft = 0")
+                        pre.focus()
+                        pre.press("ArrowRight")
+                        page.wait_for_function(
+                            "index => document.querySelectorAll('.text-block pre')[index].scrollLeft > 0",
+                            arg=block["index"],
+                        )
+                        assert pre.evaluate("el => { el.scrollLeft = el.scrollWidth; return el.scrollLeft > 0; }"), block
+                        pre.evaluate("el => el.scrollLeft = 0")
+            assert_diagram_structure(page)
 
             for index, expected in enumerate(expected_text):
                 block = text_blocks.nth(index)
@@ -557,17 +627,17 @@ def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
                 assert lines[3] == shifted, (aria_label, lines)
                 assert lines[-1].endswith(": " + discarded), (aria_label, lines)
 
-            # Burmese fallback fonts differ by platform; allow a few extra wrapped rows.
+            # Diagram rows are content, not padding: bound only extra chrome around them.
+            for block in mobile_layout:
+                if block["mode"] == "preserve":
+                    source = expected_text[block["index"]]
+                    row_height = len(source.splitlines()) * 20
+                    assert row_height <= block["height"] <= row_height + 55, (width, block)
+            # Flowing output can wrap differently with Burmese fallback fonts.
             for label, phone_height, wide_phone_height in (
-                ("Block number and timestamp", 185, 165),
-                ("Bytes32 to bytes16", 345, 285),
-                ("Mixed value", 145, 145),
-                ("Bitwise OR", 305, 285),
-                ("Architecture", 545, 485),
-                ("Password layout", 265, 225),
-                ("Helper call flow", 285, 225),
-                ("Nonce calculation", 205, 205),
-                ("Contract call flow", 265, 245),
+                ("Block number and timestamp", 265, 225),
+                ("Constructor values", 225, 185),
+                ("Nonce calculation", 305, 245),
             ):
                 block = next(item for item in mobile_layout if item["ariaLabel"] == label + " block")
                 maximum = phone_height if width == 320 else wide_phone_height
@@ -591,6 +661,7 @@ def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
         page.add_style_tag(content=".text-block pre { font-size: 28px; line-height: 40px; }")
         page.evaluate("document.fonts.ready")
         assert_copy_clear_of_source(page)
+        assert_diagram_structure(page)
         assert page.locator('.text-block[data-wrap="flow"] pre').evaluate_all(
             "elements => elements.every(el => el.scrollWidth <= el.clientWidth + 1 && "
             "el.scrollHeight <= el.clientHeight + 1)"
@@ -601,10 +672,10 @@ def check_mobile_text_examples(browser, base, origin, checks, errors, failures):
         )
         assert_no_horizontal_overflow(page)
     context.close()
-    checks.append("All 28 mobile text and terminal listings fit, copy exactly, and retain 14px/20px typography")
-    checks.append("Architecture, terminal, byte examples, and call flows meet compact phone-size bounds without clipping")
+    checks.append("All 28 mobile text and terminal listings copy exactly and retain 14px/20px typography")
+    checks.append("Diagram borders, arrows, branches, byte brackets, and separators stay intact with contained horizontal scrolling")
     checks.append("Right and Left shift listings retain their accepted heights and fit 320px and 390px phones")
-    checks.append("Flowing output remains readable at 200% text size without Copy covering any source characters")
+    checks.append("Flowing output and aligned diagrams remain readable at 200% text size without Copy covering source")
 
 
 def main():

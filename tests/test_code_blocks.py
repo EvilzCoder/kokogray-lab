@@ -627,66 +627,153 @@ class MagicVaultCodeBlockBuildTests(unittest.TestCase):
                 self.assertNotIn("→", fence.source)
                 self.assertNotIn("←", fence.source)
 
-    def test_all_non_shift_text_examples_use_flow_without_hiding_content(self):
-        text_fences = [fence for fence in self.fences if fence.language == "text"]
-        shifts = {"Right shift", "Left shift"}
+    def one_text_fence(self, title: str) -> Fence:
+        return only(
+            [fence for fence in self.fences if fence.attribute("title") == title],
+            f"{title} text fence",
+        )
 
+    def test_aligned_diagrams_preserve_lines_instead_of_using_flow(self):
+        preserved = {
+            "Bytes32 to bytes16", "Mixed value", "Bytes16 to bytes8",
+            "Right shift", "Left shift", "Bitwise OR", "Architecture",
+            "64-bit shift", "Password halves", "Input byte layout",
+            "Password layout", "Password bitwise OR", "Helper call flow",
+            "Password assembly", "Contract call flow",
+        }
+        text_fences = [fence for fence in self.fences if fence.language == "text"]
+        self.assertEqual(
+            {fence.attribute("title") for fence in text_fences if fence.attribute("layout") != "flow"},
+            preserved,
+        )
         for fence in text_fences:
-            with self.subTest(title=fence.attribute("title"), source=fence.source[:40]):
-                if fence.attribute("title") in shifts:
-                    self.assertIsNone(fence.attribute("layout"), "Shift diagrams must preserve alignment")
+            with self.subTest(title=fence.attribute("title")):
+                if fence.attribute("title") in preserved:
+                    self.assertIsNone(fence.attribute("layout"), "Diagram rows must not wrap out of alignment")
                 else:
                     self.assertEqual(fence.attribute("layout"), "flow")
 
-        self.assertEqual(
-            {fence.attribute("title") for fence in text_fences if fence.attribute("layout") != "flow"},
-            shifts,
-        )
+    def test_architecture_retains_both_boxes_branches_and_target_connector(self):
+        source = self.one_text_fence("Architecture").source
+        for border in (
+            "┌" + "─" * 45 + "┐", "└" + "─" * 45 + "┘",
+            "┌" + "─" * 54 + "┐", "└" + "─" * 54 + "┘",
+        ):
+            self.assertIn(border, source)
+        self.assertIn("│  TARGET " + "─" * 36 + "┼─────┐", source)
+        self.assertIn("│  ├── msg.value == 1 ether", source)
+        self.assertIn("│  └── new Vault()", source)
+        self.assertIn("│  └── Vault ရဲ့ holder", source)
+        for field, branch in (
+            ("map.holder", "├"), ("owner", "├"), ("passphrase", "├"),
+            ("nonce", "├"), ("isUnlocked", "└"),
+        ):
+            self.assertIn(f"│  {branch}── {field}", source)
+        for function, branch in (
+            ("mapHolder()", "├"), ("unlock(bytes16 password)", "├"),
+            ("claimContent()", "└"), ("_magicPassword()", "├"),
+            ("_generateKey(reductor)", "└"),
+        ):
+            self.assertIn(f"│  {branch}── {function}", source)
+        lines = source.strip("\n").splitlines()
+        self.assertEqual(lines[1:4], ["                       │", "                       │ 1 ETH နဲ့ deploy", "                       ▼"])
+        self.assertEqual(source.count("▼"), 2)
+        target = next(index for index, line in enumerate(lines) if "TARGET" in line)
+        arrow = lines.index("                                                   ▼")
+        self.assertTrue(all(line.endswith("     │") for line in lines[target + 1:arrow]))
+        self.assertTrue(lines[arrow + 1].startswith("┌"), "TARGET must connect down to the Vault box")
 
-    def test_compacted_examples_preserve_architecture_hex_terminal_nonce_and_caller_details(self):
-        def one_text_fence(title: str) -> Fence:
-            return only(
-                [fence for fence in self.fences if fence.attribute("title") == title],
-                f"{title} text fence",
-            )
+    def test_call_flows_retain_connectors_order_and_both_sender_rows(self):
+        helper = self.one_text_fence("Helper call flow").source.strip("\n").splitlines()
+        self.assertEqual(len(helper), 16)
+        for index in (1, 4, 7, 10, 13):
+            self.assertEqual(helper[index:index + 2], ["                  │", "                  ▼"])
+        for line, value in zip(helper[::3], ("Wallet", "Vault ရဲ့ owner", "_key1", "owner အပိုင်း", "Vault.unlock(password)", "Vault.claimContent()"), strict=True):
+            self.assertIn(value, line)
 
-        architecture = one_text_fence("Architecture")
-        self.assertEqual(architecture.attribute("layout"), "flow")
-        for field in ("map.holder", "owner", "passphrase", "nonce", "isUnlocked"):
-            self.assertIn(field, architecture.source)
-        for function in ("mapHolder()", "unlock(bytes16 password)", "claimContent()", "_magicPassword()", "_generateKey(reductor)"):
-            self.assertIn(function, architecture.source)
+        callers = self.one_text_fence("Contract call flow").source
+        self.assertIn("Wallet\n  │\n  └── Solver.solve(Vault address)", callers)
+        self.assertIn("        ├── Vault.unlock(password)", callers)
+        self.assertIn("        └── Vault.claimContent()", callers)
+        self.assertLess(callers.index("Vault.unlock(password)"), callers.index("Vault.claimContent()"))
+        self.assertIn("│   Solver ထဲက msg.sender = Wallet address", callers)
+        self.assertEqual(callers.count("Vault ထဲက msg.sender = Solver address"), 2)
+        self.assertIn("              map.holder = Solver address", callers)
+        self.assertEqual(callers.strip("\n").splitlines()[4], "        │")
+        self.assertEqual(callers.strip("\n").splitlines()[7], "        │")
 
-        bytes16 = one_text_fence("Bytes32 to bytes16")
-        self.assertEqual(bytes16.attribute("layout"), "flow")
-        self.assertIn("0x11223344556677889900aabbccddeeff", bytes16.source)
-        self.assertIn("0x11223344556677889900aabbccddeeffffeeddccbbaa00998877665544332211", bytes16.source)
-        self.assertLess(bytes16.source.index("အရှေ့ဆုံး 16 bytes"), bytes16.source.index("အနောက်ဆုံး 16 bytes"))
+    def test_calculation_separators_stay_aligned_with_operands_and_results(self):
+        for title, column, width in (
+            ("Mixed value", 12, 34), ("Password bitwise OR", 8, 34),
+            ("Password assembly", 13, 33),
+        ):
+            with self.subTest(title=title):
+                lines = self.one_text_fence(title).source.strip("\n").splitlines()
+                self.assertEqual(len(lines), 4)
+                self.assertEqual(lines[2], " " * column + "-" * width)
+                for index in (0, 1, 3):
+                    self.assertEqual(len(lines[index][column:]), width)
+                    self.assertRegex(lines[index][column:], r"^(?:0x[0-9a-f]+|[0-9A-F]+ [0-9A-F]+)$")
 
+        source = self.one_text_fence("Bitwise OR").source
+        self.assertIn("right = 00 00 00 00 10 23 32 45\nleft  = 32 45 54 67 76 89 00 00\n        -----------------------\nOR    = 32 45 54 67 76 AB 32 45", source)
+        self.assertIn("0x10 = 0001 0000\n0x76 = 0111 0110\n       ---------\nOR   = 0111 0110 = 0x76", source)
+        self.assertIn("0x23 = 0010 0011\n0x89 = 1000 1001\n       ---------\nOR   = 1010 1011 = 0xAB", source)
+        self.assertTrue(source.rstrip().endswith("0x3245546776ab3245"))
+
+    def test_byte_brackets_and_password_halves_keep_their_grouping(self):
+        fixtures = {
+            "Bytes32 to bytes16": (
+                "[11][22][33][44][55][66][77][88]", "[99][00][aa][bb][cc][dd][ee][ff]",
+                "[ff][ee][dd][cc][bb][aa][00][99]", "[88][77][66][55][44][33][22][11]",
+            ),
+            "Bytes16 to bytes8": (
+                "[10][23][32][45][54][67][76][89] --- < ယူမဲ့ အပိုင်း >",
+                "[99][00][aa][bb][cc][dd][ee][ff] --- < ဖြတ်ချမဲ့ အပိုင်း >",
+            ),
+            "64-bit shift": (
+                "[32][45][54][67][76][ab][32][45][00][00][00][00][00][00][00][00]",
+                "[00][00][00][00][00][00][00][00][32][45][54][67][76][ab][32][45]",
+            ),
+            "Input byte layout": (
+                "[11][22][33][44]           [32][45][54][67]",
+                "[55][66][77][88]           [76][ab][32][45]",
+                "   ဖြတ်ချမယ်                  ယူမယ်",
+                "uint64(_input) : 0x3245546776ab3245", "_secretKey    : 0x3245546776ab3245",
+            ),
+            "Password halves": (
+                "[ အရှေ့ပိုင်း 8 bytes ][ အနောက်ပိုင်း 8 bytes ]",
+                "        upper                  lower", "        64-bit                 64-bit",
+            ),
+            "Password layout": ("[ owner ရဲ့ နောက်ဆုံး 8 bytes ][ _secretKey 8 bytes ]",),
+        }
+        for title, expected_lines in fixtures.items():
+            with self.subTest(title=title):
+                lines = self.one_text_fence(title).source.splitlines()
+                for line in expected_lines:
+                    self.assertIn(line, lines)
+        source = self.one_text_fence("Bytes32 to bytes16").source
+        self.assertIn("0x11223344556677889900aabbccddeeffffeeddccbbaa00998877665544332211", source)
+        self.assertLess(source.index("အရှေ့ဆုံး 16 bytes"), source.index("အနောက်ဆုံး 16 bytes"))
+
+    def test_terminal_prompts_and_separate_state_calculations_are_restored(self):
         terminal = only([fence for fence in self.fences if fence.language == "console"], "terminal transcript")
         self.assertEqual(terminal.attribute("layout"), "flow")
         self.assertIn('export ETH_RPC_URL="http://154.57.164.69:37795/rpc"', terminal.source)
-        self.assertIn("cast block latest -f number", terminal.source)
-        self.assertIn("cast block latest -f timestamp", terminal.source)
-        self.assertIn("338", terminal.source)
-        self.assertIn("1791971800", terminal.source)
+        self.assertEqual(terminal.source.count("┌──(kali㉿kali)-[~]"), 2)
+        self.assertIn("└─$ cast block latest -f number\n338", terminal.source)
+        self.assertIn("└─$ cast block latest -f timestamp\n1791971800", terminal.source)
 
-        nonce = one_text_fence("Nonce calculation")
-        self.assertEqual(nonce.attribute("layout"), "flow")
-        self.assertLess(nonce.source.index("key1 → n"), nonce.source.index("key2 → n + 1"))
-        self.assertLess(nonce.source.index("_key1 → n"), nonce.source.index("_key2 → n + 1"))
-        self.assertIn("နှစ်ခါတွက်ပြီး nonce = n + 2", nonce.source)
-
-        callers = one_text_fence("Contract call flow")
-        self.assertEqual(callers.attribute("layout"), "flow")
-        self.assertLess(callers.source.index("Solver.solve(Vault address)"), callers.source.index("1. unlock(password)"))
-        self.assertLess(callers.source.index("1. unlock(password)"), callers.source.index("2. claimContent()"))
-        self.assertEqual(callers.source.count("Vault: msg.sender = Solver address (call နှစ်ခုလုံး)"), 1)
-        self.assertIn("map.holder = Solver address", callers.source)
+        constructor = self.one_text_fence("Constructor values").source.splitlines()
+        for line in ("msg.sender    = Setup Contract address", "address(this) = Vault Contract address", "owner         = Setup Contract address", "map.holder    = Vault Contract address"):
+            self.assertIn(line, constructor)
+        nonce = self.one_text_fence("Nonce calculation").source.splitlines()
+        for line in ("    key1 အတွက် nonce = n", "    key2 အတွက် nonce = n + 1", "    Vault ရဲ့ nonce  = n ပဲ ရှိသေးတယ်", "    _key1 အတွက် nonce = n", "    _key2 အတွက် nonce = n + 1", "    နှစ်ခါတွက်ပြီး nonce = n + 2"):
+            self.assertIn(line, nonce)
 
     def test_flow_text_value_spans_preserve_exact_long_hex_values(self):
         expected_hex_values = {
-            "0x11223344556677889900aabbccddeeffffeeddccbbaa00998877665544332211",
+            "0x3245546776ab32450000000000000000",
             "0xaabbccddeeff0011223344551122334455667788",
         }
         spans = descendants(self.document.root, tag="span", class_name="text-value")
